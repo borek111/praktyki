@@ -63,21 +63,46 @@ function StartCamera() {
 }
 
 function rgbToHsv(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const d = max - min;
-  let h = 0, s = (max === 0 ? 0 : d / max), v = max;
+  r /= 255;
+  g /= 255;
+  b /= 255;
 
-  if (d !== 0) {
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
+  let max = Math.max(r, g, b);
+  let min = Math.min(r, g, b);
+  let d = max - min;
+
+  let h = 0;
+  let s = 0;
+  let v = max;
+
+  // Oblicz S
+  if (max === 0) {
+    s = 0;
+  } else {
+    s = d / max;
+  }
+
+  // Oblicz H
+  if (d === 0) {
+    h = 0; // achromatyczny (szary)
+  } else {
+    if (max === r) {
+      h = (g - b) / d;
+      if (g < b) {
+        h += 6;
+      }
+    } else if (max === g) {
+      h = (b - r) / d + 2;
+    } else if (max === b) {
+      h = (r - g) / d + 4;
     }
+
     h *= 60;
   }
-  return [h, s, v];
+
+  return { h, s, v };
 }
+
 
 function isRed(h, s, v) {
   return (
