@@ -8,13 +8,19 @@
 </head>
 <body>
   <div class="main">
-    <div class="video-div">
-      <canvas id="canvas" width="640" height="480"></canvas>
+    <div class="camera-div">
+      <canvas id="canvas" class="canvas"></canvas>
     </div>
-    <button onclick="changeCamera()">Zmień kamerę</button>
-    <p id="result" class="result"></p>
-    <p id="log"></p>
-    <script src="detect.js"></script>
-  </div>
+    <div class="content">
+       <button onclick="changeCamera()">Zmień kamerę</button>
+       <div class="wynik">
+        <p id="result" class="result">Wynik: </p> <br> <br>
+        <p id="log" ></p>
+        <p id="tmp"></p>
+       </div>
+    </div>
+   
+  </div> 
+  <script src="detect.js"></script>
 </body>
 </html>

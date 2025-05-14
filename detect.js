@@ -6,12 +6,11 @@ const SAMPLE_SIZE = 20;
 const MAX_LENGTH = 100;
 const CHANGE_TIME = 200;
 
-// progi w przestrzeni HSV
-const H_RED_LOW = 15;      // stopnie
-const H_RED_HIGH = 345;    // stopnie
-const S_RED_MIN = 0.5;     // [0..1]
-const V_RED_MAX = 1.0;     // [0..1]
-const V_OFF = 0.4;         // poniżej tego V uznajemy "off"
+const H_RED_LOW = 15;      
+const H_RED_HIGH = 345;  
+const S_RED_MIN = 0.5;     
+const V_RED_MAX = 1.0;     
+const V_OFF = 0.4;         
 
 let lastState = "off";
 let lastSwitchTime = 0;
@@ -48,19 +47,29 @@ function StartCamera() {
         video = document.createElement('video');
         video.setAttribute('playsinline', ''); // for iOS
       }
+      
       video.srcObject = stream;
       video.play();
 
       video.addEventListener('loadedmetadata', () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        frameTimer = setInterval(() => detectLed(video), 1000 / 30);
+        frameTimer = setInterval(() => detectLed(video), 1000 / 33.33);
       });
     })
     .catch(err => {
       log.innerHTML = 'Błąd kamery: ' + err.message;
     });
 }
+
+navigator.mediaDevices.enumerateDevices().then(devices => {
+  const cams = devices.filter(d => d.kind === 'videoinput');
+  if (cams.length < 2) {
+    document.querySelector('button').style.display = 'none';
+  }
+  StartCamera();
+});
+
 
 function rgbToHsv(r, g, b) {
   r /= 255;
@@ -84,32 +93,40 @@ function rgbToHsv(r, g, b) {
 
   // Oblicz H
   if (d === 0) {
-    h = 0; // achromatyczny (szary)
-  } else {
+    h = 0; 
+  } 
+  else {
     if (max === r) {
       h = (g - b) / d;
-      if (g < b) {
+      if (g < b) 
+      {
         h += 6;
       }
-    } else if (max === g) {
+    } 
+    else if (max === g) 
+    {
       h = (b - r) / d + 2;
-    } else if (max === b) {
+    } 
+    else if (max === b) 
+    {
       h = (r - g) / d + 4;
     }
 
     h *= 60;
   }
 
-  return { h, s, v };
+  return [ h, s, v ];
 }
 
 
 function isRed(h, s, v) {
-  return (
-    (h < H_RED_LOW || h > H_RED_HIGH) &&
-    s >= S_RED_MIN &&
-    v <= V_RED_MAX
-  );
+  if ((h < H_RED_LOW || h > H_RED_HIGH) &&s >= S_RED_MIN &&v <= V_RED_MAX)
+  {
+    return true;
+  }
+  else{
+    return false;
+  }
 }
 
 function detectLed(video) {
@@ -142,11 +159,13 @@ function detectLed(video) {
     `Avg V: ${avgV.toFixed(2)}<br>` +
     `Red Detected: ${isRed(avgH, avgS, avgV)}`;
 
+
   let currentState = lastState;
   if (lastState === 'off' && isRed(avgH, avgS, avgV)) {
     currentState = 'on';
-  } else if (lastState === 'on' && avgV < V_OFF) {
+  } else if (lastState === 'on' && (avgV < V_OFF || isRed(avgH, avgS, avgV) == false)) {
     currentState = 'off';
+   
   }
 
   if (currentState !== lastState && (now - lastSwitchTime) > CHANGE_TIME) {
@@ -156,8 +175,11 @@ function detectLed(video) {
     }
     lastState = currentState;
     lastSwitchTime = now;
-  }
+  } 
 
+
+  let tmp = document.getElementById("tmp");
+  tmp.innerHTML = currentState;
   highlightArea(ctx, x, y, SAMPLE_SIZE);
 }
 
@@ -168,11 +190,3 @@ function highlightArea(ctx, x, y, size) {
   ctx.strokeStyle = 'blue';
   ctx.stroke();
 }
-
-navigator.mediaDevices.enumerateDevices().then(devices => {
-  const cams = devices.filter(d => d.kind === 'videoinput');
-  if (cams.length < 2) {
-    document.querySelector('button').style.display = 'none';
-  }
-  StartCamera();
-});
