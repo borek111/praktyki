@@ -36,7 +36,11 @@ function StartCamera() {
   }
 
   const constraints = {
-    video: { facingMode: useFrontCamera ? 'user' : 'environment' }
+    video: {
+      facingMode: useFrontCamera ? 'user' : 'environment',
+      width:  { ideal: 800, max: 800 },
+      height: { ideal: 600,  max: 600  }
+    }
   };
 
   navigator.mediaDevices.getUserMedia(constraints)
@@ -64,11 +68,21 @@ function StartCamera() {
 
 navigator.mediaDevices.enumerateDevices().then(devices => {
   const cams = devices.filter(d => d.kind === 'videoinput');
+
+  const cameraListDiv = document.getElementById('cameraList');
+  cameraListDiv.innerHTML = '<strong>Dostępne kamery:</strong><br>';
+
+  cams.forEach((cam, index) => {
+    cameraListDiv.innerHTML += `#${index + 1}: ${cam.label || 'Nieznana kamera'}<br>`;
+  });
+
   if (cams.length < 2) {
     document.querySelector('button').style.display = 'none';
   }
+
   StartCamera();
 });
+
 
 
 function rgbToHsv(r, g, b) {
