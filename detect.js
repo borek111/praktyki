@@ -183,13 +183,20 @@ function detectLed(video) {
   }
 
   if (currentState !== lastState && (now - lastSwitchTime) > CHANGE_TIME) {
+    // Obliczenie czasu trwania poprzedniego stanu
+    const stateDurationSec = ((now - lastSwitchTime) / 1000).toFixed(2);
+    const czas = document.getElementById('czas');
+    czas.textContent = `${lastState === 'on' ? 'Włączona' : 'Wyłączona'} przez ${stateDurationSec}s`;
+    
+    // Znak w ciągu wyników
     result.textContent += currentState === 'on' ? '-' : '/';
     if (result.textContent.length > MAX_LENGTH) {
       result.textContent = result.textContent.slice(-MAX_LENGTH);
     }
+
     lastState = currentState;
     lastSwitchTime = now;
-  } 
+  }
 
 
   let tmp = document.getElementById("tmp");
