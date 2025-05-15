@@ -96,6 +96,7 @@ function rgbToHsv(r, g, b) {
 
   let h = 0;
   let s = 0;
+  //ustal v
   let v = max;
 
   // Oblicz S
@@ -188,7 +189,6 @@ function detectLed(video) {
     const czas = document.getElementById('czas');
     czas.textContent = `${lastState === 'on' ? 'Włączona' : 'Wyłączona'} przez ${stateDurationSec}s`;
     
-    // Znak w ciągu wyników
     result.textContent += currentState === 'on' ? '-' : '/';
     if (result.textContent.length > MAX_LENGTH) {
       result.textContent = result.textContent.slice(-MAX_LENGTH);
