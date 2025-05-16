@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Blink Sequence</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: white;
+      transition: background-color 0.1s ease;
+    }
+    button {
+      padding: 1em 2em;
+      font-size: 1.2em;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <button id="blinkBtn">Zacznij miganie</button>
+
+  <script>
+    const durations = [1, 1, 1];
+    const states = ['on', 'off', 'on'];
+    let running = false;
+
+    document.getElementById('blinkBtn').addEventListener('click', () => {
+      if (running) return;      
+      running = true;
+      let idx = 0;
+
+      function step() {
+        if (idx >= durations.length) {
+          // koniec sekwencji 
+          document.body.style.backgroundColor = 'white';
+          running = false;
+          return;
+        }
+
+        // ustaw kolor wg stanu
+        if (states[idx] === 'on') {
+          document.body.style.backgroundColor = 'red';
+        } else {
+          document.body.style.backgroundColor = 'white';
+        }
+
+        // za X sekund idziemy do kolejnego kroku
+        setTimeout(() => {
+          idx++;
+          step();
+        }, durations[idx] * 1000);
+      }
+
+      step();
+    });
+  </script>
+</body>
+</html>

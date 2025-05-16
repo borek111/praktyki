@@ -19,6 +19,20 @@ let useFrontCamera = true;
 let video = null;
 let frameTimer = null;
 
+const TOLERANCE = 0.1;    // 100 ms
+let templates = [];
+let stateDurations = [];  // zbiera { state, duration } przy każdym przełączeniu
+
+const END_SEQUENCE_TIMEOUT = 2000; 
+let sequenceEnded = false; 
+
+// załaduj szablony raz przy starcie
+fetch('templates.json')
+  .then(res => res.json())
+  .then(data => { templates = data; })
+  .catch(err => console.error('templates.json load error:', err));
+
+
 function changeCamera() {
   useFrontCamera = !useFrontCamera;
   StartCamera();
@@ -144,6 +158,34 @@ function isRed(h, s, v) {
   }
 }
 
+function checkTemplates() {
+  // wyciągnij tylko czasy, pomijając same nazwy stanów
+  const seq = stateDurations.map(r => r.duration);
+
+  // dla każdego szablonu sprawdź długość i tolerancję
+  for (const tpl of templates) {
+    if (tpl.durations.length !== seq.length) continue;
+
+    let match = true;
+    for (let i = 0; i < seq.length; i++) {
+      if (Math.abs(seq[i] - tpl.durations[i]) > TOLERANCE) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      // wypisz opis pod wynikiem
+      document.getElementById('log').innerHTML += `<br><strong>Pattern:</strong> ${tpl.description}`;
+      document.getElementById('templateDesc').textContent = tpl.description;
+      console.log('Dopasowanie szablonu:', tpl.description);
+
+      return;
+    }
+  }
+  // jeśli żaden szablon nie pasuje, nic nie robimy lub pokazujemy “brak dopasowania”
+}
+
+
 function detectLed(video) {
   const now = performance.now();
   const ctx = canvas.getContext('2d');
@@ -184,23 +226,41 @@ function detectLed(video) {
   }
 
   if (currentState !== lastState && (now - lastSwitchTime) > CHANGE_TIME) {
-    // Obliczenie czasu trwania poprzedniego stanu
-    const stateDurationSec = ((now - lastSwitchTime) / 1000).toFixed(2);
-    const czas = document.getElementById('czas');
-    czas.textContent = `${lastState === 'on' ? 'Włączona' : 'Wyłączona'} przez ${stateDurationSec}s`;
-    
-    result.textContent += currentState === 'on' ? '-' : '/';
+    const durationSec = ((now - lastSwitchTime) / 1000).toFixed(2);
+
+    document.getElementById('czas').textContent =
+      `${lastState === 'on' ? 'Włączona' : 'Wyłączona'} przez ${durationSec}s`;
+
+    // dodaj do sekwencji (pierwsze 'off' ‑ jeśli na początku ‑ usuwamy)
+    stateDurations.push({ state: lastState, duration: parseFloat(durationSec) });
+    if (stateDurations.length === 1 && stateDurations[0].state === 'off') {
+      stateDurations.shift();
+    }
+
+    // dopisz symbol '-' lub '/' i obetnij wynik do MAX_LENGTH
+    result.textContent += (currentState === 'on' ? '-' : '/');
     if (result.textContent.length > MAX_LENGTH) {
       result.textContent = result.textContent.slice(-MAX_LENGTH);
     }
 
+    // przygotuj się na nowe przełączenie
     lastState = currentState;
     lastSwitchTime = now;
+    sequenceEnded = false;
   }
 
+  // 5) Jeżeli przez END_SEQUENCE_TIMEOUT nie było zmiany → koniec sekwencji
+  if (!sequenceEnded && (now - lastSwitchTime) > END_SEQUENCE_TIMEOUT) {
+    stateDurations.push({ state: lastState, duration: 2.0 });
+    stateDurations.pop();
+    checkTemplates();
 
-  let tmp = document.getElementById("tmp");
-  tmp.innerHTML = currentState;
+
+    sequenceEnded = true;
+  }
+
+  
+
   highlightArea(ctx, x, y, SAMPLE_SIZE);
 }
 
@@ -210,4 +270,14 @@ function highlightArea(ctx, x, y, size) {
   ctx.lineWidth = 2;
   ctx.strokeStyle = 'blue';
   ctx.stroke();
+}
+
+function reset() {
+  result.textContent = '';
+  stateDurations = [];
+  lastState = 'off';
+  lastSwitchTime = performance.now();
+  sequenceEnded = false;
+  document.getElementById('czas').textContent = '';
+  document.getElementById('templateDesc').textContent = '';
 }
