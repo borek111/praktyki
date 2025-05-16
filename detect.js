@@ -19,7 +19,7 @@ let useFrontCamera = true;
 let video = null;
 let frameTimer = null;
 
-const TOLERANCE = 0.1;    // 100 ms
+const TOLERANCE = 0.1;    
 let templates = [];
 let stateDurations = [];  // zbiera { state, duration } przy każdym przełączeniu
 
@@ -182,7 +182,6 @@ function checkTemplates() {
       return;
     }
   }
-  // jeśli żaden szablon nie pasuje, nic nie robimy lub pokazujemy “brak dopasowania”
 }
 
 
@@ -258,8 +257,6 @@ function detectLed(video) {
 
     sequenceEnded = true;
   }
-
-  
 
   highlightArea(ctx, x, y, SAMPLE_SIZE);
 }
