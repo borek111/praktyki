@@ -19,7 +19,7 @@ let useFrontCamera = true;
 let video = null;
 let frameTimer = null;
 
-const TOLERANCE = 0.5;    
+const TOLERANCE = 0.1;    
 let templates = [];
 let stateDurations = [];  // zbiera { state, duration } przy każdym przełączeniu
 
