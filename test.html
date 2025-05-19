@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <title>Blink Sequence</title>
+  <title>Title</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -21,11 +21,11 @@
   </style>
 </head>
 <body>
-  <button id="blinkBtn">Zacznij miganie</button>
+  <button id="blinkBtn">TEST!</button>
 
   <script>
-    const durations = [1, 1, 1];
-    const states = ['on', 'off', 'on'];
+    const durations = [1, 0.5, 0.5, 1, 1.5];
+    const states = ['on','off','on','off','on'];
     let running = false;
 
     document.getElementById('blinkBtn').addEventListener('click', () => {
@@ -35,20 +35,17 @@
 
       function step() {
         if (idx >= durations.length) {
-          // koniec sekwencji 
           document.body.style.backgroundColor = 'white';
           running = false;
           return;
         }
 
-        // ustaw kolor wg stanu
         if (states[idx] === 'on') {
           document.body.style.backgroundColor = 'red';
         } else {
           document.body.style.backgroundColor = 'white';
         }
 
-        // za X sekund idziemy do kolejnego kroku
         setTimeout(() => {
           idx++;
           step();

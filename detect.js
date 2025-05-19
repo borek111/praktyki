@@ -19,14 +19,14 @@ let useFrontCamera = true;
 let video = null;
 let frameTimer = null;
 
-const TOLERANCE = 0.1;    
+const TOLERANCE = 0.5;    
 let templates = [];
 let stateDurations = [];  // zbiera { state, duration } przy każdym przełączeniu
 
 const END_SEQUENCE_TIMEOUT = 2000; 
 let sequenceEnded = false; 
 
-// załaduj szablony raz przy starcie
+// dodaj szablon
 fetch('templates.json')
   .then(res => res.json())
   .then(data => { templates = data; })
@@ -159,29 +159,34 @@ function isRed(h, s, v) {
 }
 
 function checkTemplates() {
-  // wyciągnij tylko czasy, pomijając same nazwy stanów
+  console.log("TEST");
   const seq = stateDurations.map(r => r.duration);
 
   // dla każdego szablonu sprawdź długość i tolerancję
-  for (const tpl of templates) {
+  for (const tpl of templates) 
+  {
+    console.log("PETLA");
     if (tpl.durations.length !== seq.length) continue;
 
     let match = true;
-    for (let i = 0; i < seq.length; i++) {
+    for (let i = 0; i < seq.length; i++) 
+    {
       if (Math.abs(seq[i] - tpl.durations[i]) > TOLERANCE) {
         match = false;
         break;
       }
     }
     if (match) {
-      // wypisz opis pod wynikiem
-      document.getElementById('log').innerHTML += `<br><strong>Pattern:</strong> ${tpl.description}`;
+      document.getElementById('log').innerHTML += `<br><strong>Szablon:</strong> ${tpl.description}`;
       document.getElementById('templateDesc').textContent = tpl.description;
       console.log('Dopasowanie szablonu:', tpl.description);
-
       return;
     }
+    else{
+      console.log("NIE");
+    }
   }
+  tmp()
 }
 
 
@@ -230,31 +235,27 @@ function detectLed(video) {
     document.getElementById('czas').textContent =
       `${lastState === 'on' ? 'Włączona' : 'Wyłączona'} przez ${durationSec}s`;
 
-    // dodaj do sekwencji (pierwsze 'off' ‑ jeśli na początku ‑ usuwamy)
+    // dodaj do sekwencji (usun off na poczatku)
     stateDurations.push({ state: lastState, duration: parseFloat(durationSec) });
     if (stateDurations.length === 1 && stateDurations[0].state === 'off') {
       stateDurations.shift();
     }
 
-    // dopisz symbol '-' lub '/' i obetnij wynik do MAX_LENGTH
     result.textContent += (currentState === 'on' ? '-' : '/');
     if (result.textContent.length > MAX_LENGTH) {
       result.textContent = result.textContent.slice(-MAX_LENGTH);
     }
 
-    // przygotuj się na nowe przełączenie
     lastState = currentState;
     lastSwitchTime = now;
     sequenceEnded = false;
   }
 
-  // 5) Jeżeli przez END_SEQUENCE_TIMEOUT nie było zmiany → koniec sekwencji
+  // Jeżeli przez END_SEQUENCE_TIMEOUT nie było zmiany to koniec sekwencji
   if (!sequenceEnded && (now - lastSwitchTime) > END_SEQUENCE_TIMEOUT) {
     stateDurations.push({ state: lastState, duration: 2.0 });
     stateDurations.pop();
     checkTemplates();
-
-
     sequenceEnded = true;
   }
 
@@ -270,11 +271,18 @@ function highlightArea(ctx, x, y, size) {
 }
 
 function reset() {
-  result.textContent = '';
+  result.textContent = 'Wynik: ';
   stateDurations = [];
   lastState = 'off';
   lastSwitchTime = performance.now();
   sequenceEnded = false;
   document.getElementById('czas').textContent = '';
   document.getElementById('templateDesc').textContent = '';
+}
+
+function tmp(){
+  stateDurations = [];
+  lastState = 'off';
+  lastSwitchTime = performance.now();
+  sequenceEnded = false;
 }
