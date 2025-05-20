@@ -3,7 +3,7 @@ const result = document.getElementById('result');
 const log = document.getElementById('log');
 
 const SAMPLE_SIZE = 15;
-const MAX_LENGTH = 20;
+const MAX_LENGTH = 100;
 const CHANGE_TIME = 200;
 
 const H_RED_LOW = 15;      
@@ -12,14 +12,14 @@ const S_RED_MIN = 0.5;
 const V_RED_MAX = 1.0;     
 const V_RED_OFF = 0.4;
 
-const H_GREEN_LOW = 105;      
-const H_GREEN_HIGH = 135;  
+const H_GREEN_LOW = 85;      
+const H_GREEN_HIGH = 150;  
 const S_GREEN_MIN = 0.5;     
 const V_GREEN_MAX = 1.0;     
 const V_GREEN_OFF = 0.4; 
 
-const H_YELLOW_LOW = 45;      
-const H_YELLOW_HIGH = 75;  
+const H_YELLOW_LOW = 40;      
+const H_YELLOW_HIGH = 65;  
 const S_YELLOW_MIN = 0.5;     
 const V_YELLOW_MAX = 1.0;     
 const V_YELLOW_OFF = 0.4;
@@ -243,6 +243,8 @@ function detectLed(video) {
 
   const hsvResults = [];
   const redDetected = [];
+  const greenDetected = [];
+  const yellowDetected = [];
 
   positions.forEach((pos, i) => {
     const data = ctx.getImageData(pos.x, pos.y, SAMPLE_SIZE, SAMPLE_SIZE).data;
@@ -259,6 +261,8 @@ function detectLed(video) {
     const avgV = sumV / pxCount;
     hsvResults[i] = { avgH, avgS, avgV };
     redDetected[i] = isRed(avgH, avgS, avgV);
+    greenDetected[i] = isGreen(avgH, avgS, avgV);
+    yellowDetected[i] = isYellow(avgH, avgS, avgV);
 
     highlightArea(
       ctx,
@@ -270,7 +274,7 @@ function detectLed(video) {
 
   // Wyświetl logi
   log.innerHTML = hsvResults.map((r, i) =>
-    `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, czerwony: ${redDetected[i]}`
+    `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, czerwony: ${redDetected[i]}, zielony: ${greenDetected[i]}, żółty: ${yellowDetected[i]}`
   ).join('<br>');
 
   // narazie sekwecnja dla srodka prawwgo jest. TODO zrobic lepiej 
