@@ -2,15 +2,27 @@ const canvas = document.getElementById('canvas');
 const result = document.getElementById('result');
 const log = document.getElementById('log');
 
-const SAMPLE_SIZE = 20;
-const MAX_LENGTH = 100;
+const SAMPLE_SIZE = 15;
+const MAX_LENGTH = 20;
 const CHANGE_TIME = 200;
 
 const H_RED_LOW = 15;      
 const H_RED_HIGH = 345;  
 const S_RED_MIN = 0.5;     
 const V_RED_MAX = 1.0;     
-const V_OFF = 0.4;         
+const V_RED_OFF = 0.4;
+
+const H_GREEN_LOW = 105;      
+const H_GREEN_HIGH = 135;  
+const S_GREEN_MIN = 0.5;     
+const V_GREEN_MAX = 1.0;     
+const V_GREEN_OFF = 0.4; 
+
+const H_YELLOW_LOW = 45;      
+const H_YELLOW_HIGH = 75;  
+const S_YELLOW_MIN = 0.5;     
+const V_YELLOW_MAX = 1.0;     
+const V_YELLOW_OFF = 0.4;
 
 let lastState = "off";
 let lastSwitchTime = 0;
@@ -19,12 +31,15 @@ let useFrontCamera = true;
 let video = null;
 let frameTimer = null;
 
-const TOLERANCE = 0.1;    
+const TOLERANCE = 0.5;    
 let templates = [];
 let stateDurations = [];  // zbiera { state, duration } przy każdym przełączeniu
 
 const END_SEQUENCE_TIMEOUT = 2000; 
 let sequenceEnded = false; 
+
+const prefix = "Wynik: ";
+let ResultSequence = '';
 
 // dodaj szablon
 fetch('templates.json')
@@ -53,7 +68,7 @@ function StartCamera() {
     video: {
       facingMode: useFrontCamera ? 'user' : 'environment',
       width:  { ideal: 800, max: 800 },
-      height: { ideal: 600,  max: 600  }
+      height: { ideal: 600, max: 600  }
     }
   };
 
@@ -157,6 +172,25 @@ function isRed(h, s, v) {
     return false;
   }
 }
+function isGreen(h, s, v) {
+  if ((h > H_GREEN_LOW && h < H_GREEN_HIGH) &&s >= S_GREEN_MIN &&v <= V_GREEN_MAX)
+  {
+    return true;
+  }
+  else{
+    return false;
+  }
+}
+
+function isYellow(h, s, v) {
+  if ((h > H_YELLOW_LOW && h < H_YELLOW_HIGH) &&s >= S_YELLOW_MIN &&v <= V_YELLOW_MAX)
+  {
+    return true;
+  }
+  else{
+    return false;
+  }
+}
 
 function checkTemplates() {
   console.log("TEST");
@@ -196,77 +230,96 @@ function detectLed(video) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const x = (canvas.width - SAMPLE_SIZE) / 2;
-  const y = (canvas.height - SAMPLE_SIZE) / 2;
-  const data = ctx.getImageData(x, y, SAMPLE_SIZE, SAMPLE_SIZE).data;
+  //TODO jakies madre ustawienie tego cza zrobic 
+  //najpierw dwa gorne, potem te boczne(na poczatek lewe)
+  const positions = [
+    { x:300, y: 300 },
+    { x:500, y: 300 },
+    { x:100, y: 450 },
+    { x:100, y: 500 },
+    { x:700, y: 450 },
+    { x:700, y: 500 }
+  ];
 
-  let sumH = 0, sumS = 0, sumV = 0;
-  const pxCount = SAMPLE_SIZE * SAMPLE_SIZE;
+  const hsvResults = [];
+  const redDetected = [];
 
-  for (let i = 0; i < data.length; i += 4) {
-    const [h, s, v] = rgbToHsv(data[i], data[i + 1], data[i + 2]);
-    sumH += h;
-    sumS += s;
-    sumV += v;
-  }
+  positions.forEach((pos, i) => {
+    const data = ctx.getImageData(pos.x, pos.y, SAMPLE_SIZE, SAMPLE_SIZE).data;
+    let sumH = 0, sumS = 0, sumV = 0;
+    const pxCount = SAMPLE_SIZE * SAMPLE_SIZE;
 
-  const avgH = sumH / pxCount;
-  const avgS = sumS / pxCount;
-  const avgV = sumV / pxCount;
+    for (let p = 0; p < data.length; p += 4) {
+      const [h, s, v] = rgbToHsv(data[p], data[p+1], data[p+2]);
+      sumH += h; sumS += s; sumV += v;
+    }
 
-  log.innerHTML =
-    `Avg H: ${avgH.toFixed(1)}<br>` +
-    `Avg S: ${avgS.toFixed(2)}<br>` +
-    `Avg V: ${avgV.toFixed(2)}<br>` +
-    `Red Detected: ${isRed(avgH, avgS, avgV)}`;
+    const avgH = sumH / pxCount;
+    const avgS = sumS / pxCount;
+    const avgV = sumV / pxCount;
+    hsvResults[i] = { avgH, avgS, avgV };
+    redDetected[i] = isRed(avgH, avgS, avgV);
 
+    highlightArea(
+      ctx,
+      pos.x, pos.y,
+      SAMPLE_SIZE,
+      redDetected[i] ? 'green' : 'blue'
+    );
+  });
 
+  // Wyświetl logi
+  log.innerHTML = hsvResults.map((r, i) =>
+    `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, czerwony: ${redDetected[i]}`
+  ).join('<br>');
+
+  // narazie sekwecnja dla srodka prawwgo jest. TODO zrobic lepiej 
+  const main = hsvResults[1];
   let currentState = lastState;
-  if (lastState === 'off' && isRed(avgH, avgS, avgV)) {
+
+  //detect for red
+  if (lastState === 'off' && isRed(main.avgH, main.avgS, main.avgV)) {
     currentState = 'on';
-  } else if (lastState === 'on' && (avgV < V_OFF || isRed(avgH, avgS, avgV) == false)) {
+  } else if (lastState === 'on' && (main.avgV < V_RED_OFF || !isRed(main.avgH, main.avgS, main.avgV))) {
     currentState = 'off';
-   
   }
 
   if (currentState !== lastState && (now - lastSwitchTime) > CHANGE_TIME) {
     const durationSec = ((now - lastSwitchTime) / 1000).toFixed(2);
-
     document.getElementById('czas').textContent =
       `${lastState === 'on' ? 'Włączona' : 'Wyłączona'} przez ${durationSec}s`;
 
-    // dodaj do sekwencji (usun off na poczatku)
     stateDurations.push({ state: lastState, duration: parseFloat(durationSec) });
     if (stateDurations.length === 1 && stateDurations[0].state === 'off') {
       stateDurations.shift();
     }
 
-    result.textContent += (currentState === 'on' ? '-' : '/');
-    if (result.textContent.length > MAX_LENGTH) {
-      result.textContent = result.textContent.slice(-MAX_LENGTH);
+  
+    const symbol = currentState === 'on' ? '-' : '/'
+    ResultSequence = ResultSequence+ symbol;
+    if (ResultSequence.length > MAX_LENGTH) {
+      ResultSequence = ResultSequence.slice(-MAX_LENGTH);
     }
+    result.textContent = prefix + ResultSequence;
 
     lastState = currentState;
     lastSwitchTime = now;
     sequenceEnded = false;
   }
 
-  // Jeżeli przez END_SEQUENCE_TIMEOUT nie było zmiany to koniec sekwencji
   if (!sequenceEnded && (now - lastSwitchTime) > END_SEQUENCE_TIMEOUT) {
     stateDurations.push({ state: lastState, duration: 2.0 });
-    stateDurations.pop();
+    stateDurations.pop(); 
     checkTemplates();
     sequenceEnded = true;
   }
-
-  highlightArea(ctx, x, y, SAMPLE_SIZE);
 }
 
-function highlightArea(ctx, x, y, size) {
+function highlightArea(ctx, x, y, size, color = 'blue') {
   ctx.beginPath();
   ctx.rect(x, y, size, size);
   ctx.lineWidth = 2;
-  ctx.strokeStyle = 'blue';
+  ctx.strokeStyle = color;
   ctx.stroke();
 }
 
