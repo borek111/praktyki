@@ -8,18 +8,20 @@ const CHANGE_TIME = 200;
 const H_RED_LOW = 15;      
 const H_RED_HIGH = 345;  
 const S_RED_MIN = 0.5;     
-const V_RED_MAX = 1.0;     
-const V_RED_OFF = 0.4;
+const V_RED_MAX = 1.0;
+const V_RED_MIN = 0.25;     
 
 const H_GREEN_LOW = 85;      
-const H_GREEN_HIGH = 150;  
+const H_GREEN_HIGH = 130;  
 const S_GREEN_MIN = 0.5;     
-const V_GREEN_MAX = 1.0;     
+const V_GREEN_MAX = 1.0;
+const V_GREEN_MIN = 0.25;     
 
-const H_YELLOW_LOW = 40;      
-const H_YELLOW_HIGH = 65;  
+const H_YELLOW_LOW = 45;      
+const H_YELLOW_HIGH = 60;  
 const S_YELLOW_MIN = 0.5;     
 const V_YELLOW_MAX = 1.0;
+const V_YELLOW_MIN = 0.25;
 
 let lastState = "off";
 let lastSwitchTime = 0;
@@ -112,13 +114,15 @@ function rgbToHsv(r, g, b) {
 }
 
 function isRed(h, s, v) {
-  return (h < H_RED_LOW || h > H_RED_HIGH) && s >= S_RED_MIN && v <= V_RED_MAX;
+  return (h < H_RED_LOW || h > H_RED_HIGH) && s >= S_RED_MIN && (v >= V_RED_MIN && v <= V_RED_MAX); 
 }
+
 function isGreen(h, s, v) {
-  return (h > H_GREEN_LOW && h < H_GREEN_HIGH) && s >= S_GREEN_MIN && v <= V_GREEN_MAX;
+  return (h > H_GREEN_LOW && h < H_GREEN_HIGH) && s >= S_GREEN_MIN && (v >= V_GREEN_MIN && v <= V_GREEN_MAX);
 }
+
 function isYellow(h, s, v) {
-  return (h > H_YELLOW_LOW && h < H_YELLOW_HIGH) && s >= S_YELLOW_MIN && v <= V_YELLOW_MAX;
+  return (h > H_YELLOW_LOW && h < H_YELLOW_HIGH) && s >= S_YELLOW_MIN && (v >= V_YELLOW_MIN && v <= V_YELLOW_MAX); 
 }
 
 function checkTemplates() {
