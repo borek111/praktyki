@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Title</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="main">
+    <div class="camera-div">
+      <canvas id="canvas" class="canvas"></canvas>
+    </div>
+    <div class="content">
+       <button onclick="changeCamera()">Zmień kamerę</button>
+       <div class="wynik">
+        <p id="result" class="result"></p> 
+        <!-- <p id="templateDesc" class="templateDesc"></p> -->
+        <p id="cameraList" class="cameraList"></p>
+        <p id="log" class="log"></p>
+        <a href="test.html" target="_blank">strona testowa</a>
+       </div>
+      <button onclick="reset()">Reset</button>
+    </div>
+  </div> 
+  <script src="detect.js"></script>
+</body>
+</html>
