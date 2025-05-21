@@ -202,7 +202,7 @@ function detectLed(video) {
     `czerwony: ${redDetected[i]}, zielony: ${greenDetected[i]}, żółty: ${yellowDetected[i]}`
   ).join('<br>');
 
-  if (now - lastColorLogTime > 100000) {
+  if (now - lastColorLogTime > 1000) {
     const symbols = hsvResults.map((_, i) => {
       if (redDetected[i])    return 'R';
       if (yellowDetected[i]) return 'Y';
