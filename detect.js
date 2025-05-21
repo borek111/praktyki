@@ -147,16 +147,17 @@ function checkTemplates() {
 function detectLed(video) {
   const now = performance.now();
   const ctx = canvas.getContext('2d');
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
- const positions = [
-    { x: canvas.width * 0.375,  y: canvas.height * 0.5   },
-    { x: canvas.width * 0.625,  y: canvas.height * 0.5   },
-    { x: canvas.width * 0.125,  y: canvas.height * 0.75  },
-    { x: canvas.width * 0.125,  y: canvas.height * (5/6) },
-    { x: canvas.width * 0.875,  y: canvas.height * 0.75  },
-    { x: canvas.width * 0.875,  y: canvas.height * (5/6) }
+  const positions = [
+    { x: canvas.width * 0.375,       y: canvas.height * 0.5    },
+    { x: canvas.width * 0.625,       y: canvas.height * 0.5    },
+    { x: canvas.width * 0.125,       y: canvas.height * 0.75   },
+    { x: canvas.width * 0.125,       y: canvas.height * (5/6)  },
+    { x: canvas.width * 0.875,       y: canvas.height * 0.75   },
+    { x: canvas.width * 0.875,       y: canvas.height * (5/6)  }
   ];
 
   const hsvResults   = [];
@@ -172,56 +173,61 @@ function detectLed(video) {
       const [h, s, v] = rgbToHsv(data[p], data[p+1], data[p+2]);
       sumH += h; sumS += s; sumV += v;
     }
-    const avgH = sumH / pxCount;
-    const avgS = sumS / pxCount;
-    const avgV = sumV / pxCount;
+    const avgH = sumH / pxCount, avgS = sumS / pxCount, avgV = sumV / pxCount;
     hsvResults[i]     = { avgH, avgS, avgV };
     redDetected[i]    = isRed(avgH, avgS, avgV);
     greenDetected[i]  = isGreen(avgH, avgS, avgV);
     yellowDetected[i] = isYellow(avgH, avgS, avgV);
 
-    // rysowanie ramki w wykrytym kolorze
     let drawColor = 'blue';
     if (redDetected[i])    drawColor = 'red';
     else if (greenDetected[i])  drawColor = 'green';
     else if (yellowDetected[i]) drawColor = 'yellow';
     highlightArea(ctx, pos.x, pos.y, SAMPLE_SIZE, drawColor);
+
+    //numer punktu
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      i + 1,
+      pos.x + SAMPLE_SIZE / 2,
+      pos.y + SAMPLE_SIZE / 2
+    );
   });
 
   log.innerHTML = hsvResults.map((r, i) =>
-    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, ` +
-    `S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, ` +
+    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, ` +
     `czerwony: ${redDetected[i]}, zielony: ${greenDetected[i]}, żółty: ${yellowDetected[i]}`
   ).join('<br>');
 
-
-  if (now - lastColorLogTime > 1000) {
+  if (now - lastColorLogTime > 100000) {
     const symbols = hsvResults.map((_, i) => {
       if (redDetected[i])    return 'R';
       if (yellowDetected[i]) return 'Y';
       if (greenDetected[i])  return 'G';
       return 'O';
     });
-
     let html = `
-      <table style="border-collapse: collapse; width: 100%;">
+      <table>
         <tr>
-          <th style="border:1px solid #333; padding:4px;">Punkt</th>
-          <th style="border:1px solid #333; padding:4px;">Kolor</th>
+          <th>Punkt</th>
+          <th>Kolor</th>
         </tr>`;
     symbols.forEach((sym, i) => {
       html += `
         <tr>
-          <td style="border:1px solid #333; padding:4px; text-align:center;">${i+1}</td>
-          <td style="border:1px solid #333; padding:4px; text-align:center;">${sym}</td>
+          <td>${i+1}</td>
+          <td>${sym}</td>
         </tr>`;
     });
     html += `</table>`;
-
     result.innerHTML = html;
     lastColorLogTime = now;
   }
 }
+
 
 function highlightArea(ctx, x, y, size, color = 'blue') {
   ctx.beginPath();

@@ -60,16 +60,28 @@ button {
     margin-top: 10px;
     color: #f0f0f0;
 }
-
+table{
+    border: 1px solid black;
+    width: 100%;
+    border-collapse: collapse;
+}
+th,td{
+    border: 1px solid black;
+    border-collapse: collapse;
+}
 @media (max-width: 768px) {
-
     .main {
         padding: 10px;
     }
 
     .camera-div {
         width: 100%;
-        aspect-ratio: 4/4;
+        aspect-ratio: 1 / 1;
+        height: auto;
+    }
+
+    canvas {
+        max-height: none;
     }
 
     button {
@@ -84,9 +96,14 @@ button {
 }
 
 @media (max-width: 480px) {
-     .camera-div {
+    .camera-div {
         width: 100%;
-        aspect-ratio: 4 / 5; 
+        aspect-ratio: 4 / 5;
+        height: auto;
+    }
+
+    canvas {
+        max-height: none;
     }
 
     button {
@@ -99,7 +116,8 @@ button {
         font-size: 1rem;
     }
 
-    #log, #tmp {
+    #log,
+    #tmp {
         font-size: 0.75rem;
     }
 }
