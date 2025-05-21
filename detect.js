@@ -3,7 +3,6 @@ const result = document.getElementById('result');
 const log = document.getElementById('log');
 
 const SAMPLE_SIZE = 15;
-const MAX_LENGTH = 100;
 const CHANGE_TIME = 200;
 
 const H_RED_LOW = 15;      
@@ -16,13 +15,11 @@ const H_GREEN_LOW = 85;
 const H_GREEN_HIGH = 150;  
 const S_GREEN_MIN = 0.5;     
 const V_GREEN_MAX = 1.0;     
-const V_GREEN_OFF = 0.4; 
 
 const H_YELLOW_LOW = 40;      
 const H_YELLOW_HIGH = 65;  
 const S_YELLOW_MIN = 0.5;     
-const V_YELLOW_MAX = 1.0;     
-const V_YELLOW_OFF = 0.4;
+const V_YELLOW_MAX = 1.0;
 
 let lastState = "off";
 let lastSwitchTime = 0;
@@ -31,22 +28,22 @@ let useFrontCamera = true;
 let video = null;
 let frameTimer = null;
 
-const TOLERANCE = 0.5;    
+// Nowa zmienna do co‑sekundowego logowania kolorów
+let lastColorLogTime = 0;
+
+const TOLERANCE = 0.5;
 let templates = [];
-let stateDurations = [];  // zbiera { state, duration } przy każdym przełączeniu
+let stateDurations = [];  // zbiera { state, duration }
 
-const END_SEQUENCE_TIMEOUT = 2000; 
-let sequenceEnded = false; 
+const END_SEQUENCE_TIMEOUT = 2000;
+let sequenceEnded = false;
 
-const prefix = "Wynik: ";
-let ResultSequence = '';
 
-// dodaj szablon
+// załaduj szablony
 fetch('templates.json')
   .then(res => res.json())
   .then(data => { templates = data; })
   .catch(err => console.error('templates.json load error:', err));
-
 
 function changeCamera() {
   useFrontCamera = !useFrontCamera;
@@ -54,7 +51,6 @@ function changeCamera() {
 }
 
 function StartCamera() {
-  // zatrzymaj poprzedni stream
   if (currentStream) {
     currentStream.getTracks().forEach(track => track.stop());
     currentStream = null;
@@ -75,12 +71,10 @@ function StartCamera() {
   navigator.mediaDevices.getUserMedia(constraints)
     .then(stream => {
       currentStream = stream;
-
       if (!video) {
         video = document.createElement('video');
-        video.setAttribute('playsinline', ''); // for iOS
+        video.setAttribute('playsinline', '');
       }
-      
       video.srcObject = stream;
       video.play();
 
@@ -97,132 +91,58 @@ function StartCamera() {
 
 navigator.mediaDevices.enumerateDevices().then(devices => {
   const cams = devices.filter(d => d.kind === 'videoinput');
-
   const cameraListDiv = document.getElementById('cameraList');
   cameraListDiv.innerHTML = '<strong>Dostępne kamery:</strong><br>';
-
   cams.forEach((cam, index) => {
     cameraListDiv.innerHTML += `#${index + 1}: ${cam.label || 'Nieznana kamera'}<br>`;
   });
-
-  if (cams.length < 2) {
-    document.querySelector('button').style.display = 'none';
-  }
-
+  if (cams.length < 2) document.querySelector('button').style.display = 'none';
   StartCamera();
 });
 
-
-
 function rgbToHsv(r, g, b) {
-  r /= 255;
-  g /= 255;
-  b /= 255;
+  r /= 255; g /= 255; b /= 255;
+  let max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0, s = max === 0 ? 0 : d / max, v = max;
 
-  let max = Math.max(r, g, b);
-  let min = Math.min(r, g, b);
-  let d = max - min;
-
-  let h = 0;
-  let s = 0;
-  //ustal v
-  let v = max;
-
-  // Oblicz S
-  if (max === 0) {
-    s = 0;
-  } else {
-    s = d / max;
-  }
-
-  // Oblicz H
-  if (d === 0) {
-    h = 0; 
-  } 
-  else {
-    if (max === r) {
-      h = (g - b) / d;
-      if (g < b) 
-      {
-        h += 6;
-      }
-    } 
-    else if (max === g) 
-    {
-      h = (b - r) / d + 2;
-    } 
-    else if (max === b) 
-    {
-      h = (r - g) / d + 4;
-    }
-
+  if (d !== 0) {
+    if (max === r) { h = (g - b) / d + (g < b ? 6 : 0); }
+    else if (max === g) { h = (b - r) / d + 2; }
+    else { h = (r - g) / d + 4; }
     h *= 60;
   }
 
-  return [ h, s, v ];
+  return [h, s, v];
 }
-
 
 function isRed(h, s, v) {
-  if ((h < H_RED_LOW || h > H_RED_HIGH) &&s >= S_RED_MIN &&v <= V_RED_MAX)
-  {
-    return true;
-  }
-  else{
-    return false;
-  }
+  return (h < H_RED_LOW || h > H_RED_HIGH) && s >= S_RED_MIN && v <= V_RED_MAX;
 }
 function isGreen(h, s, v) {
-  if ((h > H_GREEN_LOW && h < H_GREEN_HIGH) &&s >= S_GREEN_MIN &&v <= V_GREEN_MAX)
-  {
-    return true;
-  }
-  else{
-    return false;
-  }
+  return (h > H_GREEN_LOW && h < H_GREEN_HIGH) && s >= S_GREEN_MIN && v <= V_GREEN_MAX;
 }
-
 function isYellow(h, s, v) {
-  if ((h > H_YELLOW_LOW && h < H_YELLOW_HIGH) &&s >= S_YELLOW_MIN &&v <= V_YELLOW_MAX)
-  {
-    return true;
-  }
-  else{
-    return false;
-  }
+  return (h > H_YELLOW_LOW && h < H_YELLOW_HIGH) && s >= S_YELLOW_MIN && v <= V_YELLOW_MAX;
 }
 
 function checkTemplates() {
-  console.log("TEST");
   const seq = stateDurations.map(r => r.duration);
-
-  // dla każdego szablonu sprawdź długość i tolerancję
-  for (const tpl of templates) 
-  {
-    console.log("PETLA");
+  for (const tpl of templates) {
     if (tpl.durations.length !== seq.length) continue;
-
     let match = true;
-    for (let i = 0; i < seq.length; i++) 
-    {
+    for (let i = 0; i < seq.length; i++) {
       if (Math.abs(seq[i] - tpl.durations[i]) > TOLERANCE) {
         match = false;
         break;
       }
     }
     if (match) {
-      document.getElementById('log').innerHTML += `<br><strong>Szablon:</strong> ${tpl.description}`;
+      log.innerHTML += `<br><strong>Szablon:</strong> ${tpl.description}`;
       document.getElementById('templateDesc').textContent = tpl.description;
-      console.log('Dopasowanie szablonu:', tpl.description);
       return;
     }
-    else{
-      console.log("NIE");
-    }
   }
-  tmp()
 }
-
 
 function detectLed(video) {
   const now = performance.now();
@@ -230,92 +150,76 @@ function detectLed(video) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  //TODO jakies madre ustawienie tego cza zrobic 
-  //najpierw dwa gorne, potem te boczne(na poczatek lewe)
-  const positions = [
-    { x:300, y: 300 },
-    { x:500, y: 300 },
-    { x:100, y: 450 },
-    { x:100, y: 500 },
-    { x:700, y: 450 },
-    { x:700, y: 500 }
+ const positions = [
+    { x: canvas.width * 0.375,  y: canvas.height * 0.5   },
+    { x: canvas.width * 0.625,  y: canvas.height * 0.5   },
+    { x: canvas.width * 0.125,  y: canvas.height * 0.75  },
+    { x: canvas.width * 0.125,  y: canvas.height * (5/6) },
+    { x: canvas.width * 0.875,  y: canvas.height * 0.75  },
+    { x: canvas.width * 0.875,  y: canvas.height * (5/6) }
   ];
 
-  const hsvResults = [];
-  const redDetected = [];
-  const greenDetected = [];
+  const hsvResults   = [];
+  const redDetected    = [];
+  const greenDetected  = [];
   const yellowDetected = [];
 
   positions.forEach((pos, i) => {
     const data = ctx.getImageData(pos.x, pos.y, SAMPLE_SIZE, SAMPLE_SIZE).data;
     let sumH = 0, sumS = 0, sumV = 0;
     const pxCount = SAMPLE_SIZE * SAMPLE_SIZE;
-
     for (let p = 0; p < data.length; p += 4) {
       const [h, s, v] = rgbToHsv(data[p], data[p+1], data[p+2]);
       sumH += h; sumS += s; sumV += v;
     }
-
     const avgH = sumH / pxCount;
     const avgS = sumS / pxCount;
     const avgV = sumV / pxCount;
-    hsvResults[i] = { avgH, avgS, avgV };
-    redDetected[i] = isRed(avgH, avgS, avgV);
-    greenDetected[i] = isGreen(avgH, avgS, avgV);
+    hsvResults[i]     = { avgH, avgS, avgV };
+    redDetected[i]    = isRed(avgH, avgS, avgV);
+    greenDetected[i]  = isGreen(avgH, avgS, avgV);
     yellowDetected[i] = isYellow(avgH, avgS, avgV);
 
-    highlightArea(
-      ctx,
-      pos.x, pos.y,
-      SAMPLE_SIZE,
-      redDetected[i] ? 'green' : 'blue'
-    );
+    // rysowanie ramki w wykrytym kolorze
+    let drawColor = 'blue';
+    if (redDetected[i])    drawColor = 'red';
+    else if (greenDetected[i])  drawColor = 'green';
+    else if (yellowDetected[i]) drawColor = 'yellow';
+    highlightArea(ctx, pos.x, pos.y, SAMPLE_SIZE, drawColor);
   });
 
-  // Wyświetl logi
   log.innerHTML = hsvResults.map((r, i) =>
-    `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, czerwony: ${redDetected[i]}, zielony: ${greenDetected[i]}, żółty: ${yellowDetected[i]}`
+    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, ` +
+    `S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, ` +
+    `czerwony: ${redDetected[i]}, zielony: ${greenDetected[i]}, żółty: ${yellowDetected[i]}`
   ).join('<br>');
 
-  // narazie sekwecnja dla srodka prawwgo jest. TODO zrobic lepiej 
-  const main = hsvResults[1];
-  let currentState = lastState;
 
-  //detect for red
-  if (lastState === 'off' && isRed(main.avgH, main.avgS, main.avgV)) {
-    currentState = 'on';
-  } else if (lastState === 'on' && (main.avgV < V_RED_OFF || !isRed(main.avgH, main.avgS, main.avgV))) {
-    currentState = 'off';
-  }
+  if (now - lastColorLogTime > 1000) {
+    const symbols = hsvResults.map((_, i) => {
+      if (redDetected[i])    return 'R';
+      if (yellowDetected[i]) return 'Y';
+      if (greenDetected[i])  return 'G';
+      return 'O';
+    });
 
-  if (currentState !== lastState && (now - lastSwitchTime) > CHANGE_TIME) {
-    const durationSec = ((now - lastSwitchTime) / 1000).toFixed(2);
-    document.getElementById('czas').textContent =
-      `${lastState === 'on' ? 'Włączona' : 'Wyłączona'} przez ${durationSec}s`;
+    let html = `
+      <table style="border-collapse: collapse; width: 100%;">
+        <tr>
+          <th style="border:1px solid #333; padding:4px;">Punkt</th>
+          <th style="border:1px solid #333; padding:4px;">Kolor</th>
+        </tr>`;
+    symbols.forEach((sym, i) => {
+      html += `
+        <tr>
+          <td style="border:1px solid #333; padding:4px; text-align:center;">${i+1}</td>
+          <td style="border:1px solid #333; padding:4px; text-align:center;">${sym}</td>
+        </tr>`;
+    });
+    html += `</table>`;
 
-    stateDurations.push({ state: lastState, duration: parseFloat(durationSec) });
-    if (stateDurations.length === 1 && stateDurations[0].state === 'off') {
-      stateDurations.shift();
-    }
-
-  
-    const symbol = currentState === 'on' ? '-' : '/'
-    ResultSequence = ResultSequence+ symbol;
-    if (ResultSequence.length > MAX_LENGTH) {
-      ResultSequence = ResultSequence.slice(-MAX_LENGTH);
-    }
-    result.textContent = prefix + ResultSequence;
-
-    lastState = currentState;
-    lastSwitchTime = now;
-    sequenceEnded = false;
-  }
-
-  if (!sequenceEnded && (now - lastSwitchTime) > END_SEQUENCE_TIMEOUT) {
-    stateDurations.push({ state: lastState, duration: 2.0 });
-    stateDurations.pop(); 
-    checkTemplates();
-    sequenceEnded = true;
+    result.innerHTML = html;
+    lastColorLogTime = now;
   }
 }
 
@@ -333,13 +237,5 @@ function reset() {
   lastState = 'off';
   lastSwitchTime = performance.now();
   sequenceEnded = false;
-  document.getElementById('czas').textContent = '';
   document.getElementById('templateDesc').textContent = '';
-}
-
-function tmp(){
-  stateDurations = [];
-  lastState = 'off';
-  lastSwitchTime = performance.now();
-  sequenceEnded = false;
 }
