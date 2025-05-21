@@ -170,9 +170,9 @@ function detectLed(video) {
       sumH += h; sumS += s; sumV += v;
     }
     const avgH = sumH / pxCount, avgS = sumS / pxCount, avgV = sumV / pxCount;
-    hsvResults[i]     = { avgH, avgS, avgV };
-    redDetected[i]    = isRed(avgH, avgS, avgV);
-    greenDetected[i]  = isGreen(avgH, avgS, avgV);
+    hsvResults[i] = { avgH, avgS, avgV };
+    redDetected[i] = isRed(avgH, avgS, avgV);
+    greenDetected[i] = isGreen(avgH, avgS, avgV);
     yellowDetected[i] = isYellow(avgH, avgS, avgV);
 
     let drawColor = 'blue';
@@ -194,8 +194,7 @@ function detectLed(video) {
   });
 
   log.innerHTML = hsvResults.map((r, i) =>
-    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}, ` +
-    `czerwony: ${redDetected[i]}, zielony: ${greenDetected[i]}, żółty: ${yellowDetected[i]}`
+    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)},`
   ).join('<br>');
 
   if (now - lastColorLogTime > 1000) {
