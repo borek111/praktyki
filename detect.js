@@ -28,15 +28,11 @@ let useFrontCamera = true;
 let video = null;
 let frameTimer = null;
 
-// Nowa zmienna do co‑sekundowego logowania kolorów
 let lastColorLogTime = 0;
 
 const TOLERANCE = 0.5;
 let templates = [];
 let stateDurations = [];  // zbiera { state, duration }
-
-const END_SEQUENCE_TIMEOUT = 2000;
-let sequenceEnded = false;
 
 
 // załaduj szablony
@@ -152,12 +148,12 @@ function detectLed(video) {
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
   const positions = [
-    { x: canvas.width * 0.375,       y: canvas.height * 0.5    },
-    { x: canvas.width * 0.625,       y: canvas.height * 0.5    },
-    { x: canvas.width * 0.125,       y: canvas.height * 0.75   },
-    { x: canvas.width * 0.125,       y: canvas.height * (5/6)  },
-    { x: canvas.width * 0.875,       y: canvas.height * 0.75   },
-    { x: canvas.width * 0.875,       y: canvas.height * (5/6)  }
+    { x: canvas.width * 0.375, y: canvas.height * 0.5},
+    { x: canvas.width * 0.625, y: canvas.height * 0.5},
+    { x: canvas.width * 0.125, y: canvas.height * 0.75},
+    { x: canvas.width * 0.125, y: canvas.height * (5/6)},
+    { x: canvas.width * 0.875, y: canvas.height * 0.75},
+    { x: canvas.width * 0.875, y: canvas.height * (5/6)}
   ];
 
   const hsvResults   = [];
@@ -242,6 +238,5 @@ function reset() {
   stateDurations = [];
   lastState = 'off';
   lastSwitchTime = performance.now();
-  sequenceEnded = false;
   document.getElementById('templateDesc').textContent = '';
 }
