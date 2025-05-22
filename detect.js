@@ -311,5 +311,6 @@ function reset() {
   stateDurations = [];
   lastState = 'off';
   lastSwitchTime = performance.now();
-  document.getElementById('templateDesc').textContent = '';
 }
+let resetButton = document.getElementById("resetButton");
+resetButton.addEventListener('click',reset);
