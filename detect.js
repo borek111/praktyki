@@ -3,7 +3,6 @@ const result = document.getElementById('result');
 const log = document.getElementById('log');
 
 let sampleSize = 15;
-const CHANGE_TIME = 200;
 
 const H_RED_LOW = 15;      
 const H_RED_HIGH = 345;  
@@ -20,7 +19,7 @@ const V_GREEN_MIN = 0.25;
 const H_YELLOW_LOW = 45;      
 const H_YELLOW_HIGH = 60;  
 const S_YELLOW_MIN = 0.5;     
-const V_YELLOW_MAX = 1.0;
+const V_YELLOW_MAX = 1.0; 
 const V_YELLOW_MIN = 0.25;
 
 let lastState = "off";
@@ -34,7 +33,11 @@ let lastColorLogTime = 0;
 
 const TOLERANCE = 0.5;
 let templates = [];
-let stateDurations = [];  // zbiera { state, duration }
+let stateDurations = []; // zbiera { state, duration }
+
+let positions = [];       
+let dragIndex = -1; // indeks przeciąganego pkt
+const HANDLE_SIZE = 10; // dodatkowy margines zlapania pkt
 
 //zmiana wartosci badanego obszaru
 let sampleSizeRange = document.getElementById("sampleSizeRange");
@@ -59,41 +62,54 @@ function changeCamera() {
 
 function StartCamera() {
   if (currentStream) {
-    currentStream.getTracks().forEach(track => track.stop());
-    currentStream = null;
-  }
-  if (frameTimer) {
+    currentStream.getTracks().forEach(t => t.stop());
     clearInterval(frameTimer);
-    frameTimer = null;
   }
 
-  const constraints = {
+  navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: useFrontCamera ? 'user' : 'environment',
       width:  { ideal: 800, max: 800 },
-      height: { ideal: 600, max: 600  }
+      height: { ideal: 600, max: 600 }
     }
-  };
+  })
+  .then(stream => {
+    currentStream = stream;
+    if (!video) {
+      video = document.createElement('video');
+      video.setAttribute('playsinline', '');
+    }
+    video.srcObject = stream;
+    video.play();
 
-  navigator.mediaDevices.getUserMedia(constraints)
-    .then(stream => {
-      currentStream = stream;
-      if (!video) {
-        video = document.createElement('video');
-        video.setAttribute('playsinline', '');
-      }
-      video.srcObject = stream;
-      video.play();
+    video.addEventListener('loadedmetadata', () => {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-      video.addEventListener('loadedmetadata', () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        frameTimer = setInterval(() => detectLed(video), 1000 / 33.33);
-      });
-    })
-    .catch(err => {
-      log.innerHTML = 'Błąd kamery: ' + err.message;
+      positions = [
+        { x: canvas.width * 0.375, y: canvas.height * 0.5   },
+        { x: canvas.width * 0.625, y: canvas.height * 0.5   },
+        { x: canvas.width * 0.125, y: canvas.height * 0.75  },
+        { x: canvas.width * 0.125, y: canvas.height * (5/6)},
+        { x: canvas.width * 0.875, y: canvas.height * 0.75  },
+        { x: canvas.width * 0.875, y: canvas.height * (5/6)}
+      ];
+
+      // eventy do przeciągania punktów
+      canvas.addEventListener('mousedown', startDrag);
+      canvas.addEventListener('mousemove', doDrag);
+      canvas.addEventListener('mouseup',   endDrag);
+
+      canvas.addEventListener('touchstart', e => startDrag(e.touches[0]));
+      canvas.addEventListener('touchmove',  e => { doDrag(e.touches[0]); e.preventDefault(); });
+      canvas.addEventListener('touchend',   endDrag);
+
+      frameTimer = setInterval(() => detectLed(video), 1000 / 33.33);
     });
+  })
+  .catch(err => {
+    log.innerText = 'Błąd kamery: ' + err.message;
+  });
 }
 
 navigator.mediaDevices.enumerateDevices().then(devices => {
@@ -103,7 +119,10 @@ navigator.mediaDevices.enumerateDevices().then(devices => {
   cams.forEach((cam, index) => {
     cameraListDiv.innerHTML += `#${index + 1}: ${cam.label || 'Nieznana kamera'}<br>`;
   });
-  if (cams.length < 2) document.querySelector('button').style.display = 'none';
+  if (cams.length < 2) 
+  {
+    document.querySelector('button').style.display = 'none';
+  }
   StartCamera();
 });
 
@@ -153,63 +172,101 @@ function checkTemplates() {
   }
 }
 
+//pobierz pozycje myszy z canvy
+function getPointerPos(evt) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (evt.clientX - rect.left) * (canvas.width  / rect.width),
+    y: (evt.clientY - rect.top)  * (canvas.height / rect.height)
+  };
+}
+
+//zacznij przeciaganie
+function startDrag(evt) {
+  const p = getPointerPos(evt);
+  for (let i = 0; i < positions.length; i++) {
+    const pos = positions[i];
+    if (
+      p.x >= pos.x - sampleSize/2 - HANDLE_SIZE &&
+      p.x <= pos.x + sampleSize/2 + HANDLE_SIZE &&
+      p.y >= pos.y - sampleSize/2 - HANDLE_SIZE &&
+      p.y <= pos.y + sampleSize/2 + HANDLE_SIZE
+    ) {
+      dragIndex = i;
+      break;
+    }
+  }
+}
+
+//obsluga przeciagania
+function doDrag(evt) {
+  if (dragIndex < 0) return; // oznacza koniec przeciagania
+  const p = getPointerPos(evt);
+  // ograniczenie w obrębie canvasa
+  positions[dragIndex].x = Math.max(0, Math.min(canvas.width,  p.x));
+  positions[dragIndex].y = Math.max(0, Math.min(canvas.height, p.y));
+}
+
+//zakoncz przeciaganie
+function endDrag() {
+  dragIndex = -1;
+}
+
+
 function detectLed(video) {
   const now = performance.now();
   const ctx = canvas.getContext('2d');
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const positions = [
-    { x: canvas.width * 0.375, y: canvas.height * 0.5},
-    { x: canvas.width * 0.625, y: canvas.height * 0.5},
-    { x: canvas.width * 0.125, y: canvas.height * 0.75},
-    { x: canvas.width * 0.125, y: canvas.height * (5/6)},
-    { x: canvas.width * 0.875, y: canvas.height * 0.75},
-    { x: canvas.width * 0.875, y: canvas.height * (5/6)}
-  ];
-
   const hsvResults = [];
   const redDetected = [];
-  const greenDetected  = [];
+  const greenDetected = [];
   const yellowDetected = [];
 
   positions.forEach((pos, i) => {
-    const data = ctx.getImageData(pos.x - sampleSize / 2, pos.y -sampleSize / 2, sampleSize, sampleSize).data;
+    // odczyt pixeli centrowany wokół pos.x,pos.y
+    const data = ctx.getImageData(
+      pos.x - sampleSize/2,
+      pos.y - sampleSize/2,
+      sampleSize, sampleSize
+    ).data;
+
+    // obliczenia HSV
     let sumH = 0, sumS = 0, sumV = 0;
     const pxCount = sampleSize * sampleSize;
     for (let p = 0; p < data.length; p += 4) {
       const [h, s, v] = rgbToHsv(data[p], data[p+1], data[p+2]);
       sumH += h; sumS += s; sumV += v;
     }
-    const avgH = sumH / pxCount, avgS = sumS / pxCount, avgV = sumV / pxCount;
+    const avgH = sumH/pxCount, avgS = sumS/pxCount, avgV = sumV/pxCount;
     hsvResults[i] = { avgH, avgS, avgV };
     redDetected[i] = isRed(avgH, avgS, avgV);
     greenDetected[i] = isGreen(avgH, avgS, avgV);
     yellowDetected[i] = isYellow(avgH, avgS, avgV);
 
+    // rysowanie ramki (centrowanej) i numeru punktu
     let drawColor = 'blue';
     if (redDetected[i])    drawColor = 'red';
     else if (greenDetected[i])  drawColor = 'green';
     else if (yellowDetected[i]) drawColor = 'yellow';
-    highlightArea(ctx, pos.x, pos.y, sampleSize, drawColor);
 
-    //numer punktu
+    highlightArea(ctx, pos.x, pos.y, sampleSize, drawColor);
+    // numer punktu na środku
     ctx.fillStyle = 'white';
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(
-      i + 1,
-      pos.x ,
-      pos.y
-    );
+    ctx.fillText(i+1, pos.x, pos.y);
   });
 
+  // log HSV
   log.innerHTML = hsvResults.map((r, i) =>
-    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)},`
+    `Pole ${i+1}: H=${r.avgH.toFixed(1)}, ` +
+    `S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
   ).join('<br>');
 
+  // tabela co sekundę
   if (now - lastColorLogTime > 1000) {
     const symbols = hsvResults.map((_, i) => {
       if (redDetected[i])    return 'R';
@@ -217,18 +274,18 @@ function detectLed(video) {
       if (greenDetected[i])  return 'G';
       return 'O';
     });
+
     let html = `
-      <table>
-        <tr>
-          <th>Punkt</th>
-          <th>Kolor</th>
-        </tr>`;
+    <table>
+      <tr>
+        <th>Punkt</th>
+        <th>Kolor</th>
+      </tr>`;
     symbols.forEach((sym, i) => {
-      html += `
-        <tr>
-          <td>${i+1}</td>
-          <td>${sym}</td>
-        </tr>`;
+      html += `<tr>
+        <td>${i+1}</td>
+        <td>${sym}</td>
+      </tr>`;
     });
     html += `</table>`;
     result.innerHTML = html;
