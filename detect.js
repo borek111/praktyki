@@ -2,7 +2,7 @@ const canvas = document.getElementById('canvas');
 const result = document.getElementById('result');
 const log = document.getElementById('log');
 
-const SAMPLE_SIZE = 15;
+let sampleSize = 15;
 const CHANGE_TIME = 200;
 
 const H_RED_LOW = 15;      
@@ -35,6 +35,15 @@ let lastColorLogTime = 0;
 const TOLERANCE = 0.5;
 let templates = [];
 let stateDurations = [];  // zbiera { state, duration }
+
+let sampleSizeRange = document.getElementById("sampleSizeRange");
+let sampleSizeText = document.getElementById("sampleSizeText");
+sampleSizeRange.addEventListener('input', (e) => {
+  const val =parseInt(e.target.value);
+  sampleSize = val
+  sampleSizeText.innerHTML = "Obecna wartość to: "+ val;
+
+})
 
 
 // załaduj szablony
@@ -160,15 +169,15 @@ function detectLed(video) {
     { x: canvas.width * 0.875, y: canvas.height * (5/6)}
   ];
 
-  const hsvResults   = [];
-  const redDetected    = [];
+  const hsvResults = [];
+  const redDetected = [];
   const greenDetected  = [];
   const yellowDetected = [];
 
   positions.forEach((pos, i) => {
-    const data = ctx.getImageData(pos.x, pos.y, SAMPLE_SIZE, SAMPLE_SIZE).data;
+    const data = ctx.getImageData(pos.x - sampleSize / 2, pos.y -sampleSize / 2, sampleSize, sampleSize).data;
     let sumH = 0, sumS = 0, sumV = 0;
-    const pxCount = SAMPLE_SIZE * SAMPLE_SIZE;
+    const pxCount = sampleSize * sampleSize;
     for (let p = 0; p < data.length; p += 4) {
       const [h, s, v] = rgbToHsv(data[p], data[p+1], data[p+2]);
       sumH += h; sumS += s; sumV += v;
@@ -183,7 +192,7 @@ function detectLed(video) {
     if (redDetected[i])    drawColor = 'red';
     else if (greenDetected[i])  drawColor = 'green';
     else if (yellowDetected[i]) drawColor = 'yellow';
-    highlightArea(ctx, pos.x, pos.y, SAMPLE_SIZE, drawColor);
+    highlightArea(ctx, pos.x, pos.y, sampleSize, drawColor);
 
     //numer punktu
     ctx.fillStyle = 'white';
@@ -192,8 +201,8 @@ function detectLed(video) {
     ctx.textBaseline = 'middle';
     ctx.fillText(
       i + 1,
-      pos.x + SAMPLE_SIZE / 2,
-      pos.y + SAMPLE_SIZE / 2
+      pos.x ,
+      pos.y
     );
   });
 
@@ -230,7 +239,7 @@ function detectLed(video) {
 
 function highlightArea(ctx, x, y, size, color = 'blue') {
   ctx.beginPath();
-  ctx.rect(x, y, size, size);
+  ctx.rect(x - size /2, y - size /2, size, size);
   ctx.lineWidth = 2;
   ctx.strokeStyle = color;
   ctx.stroke();
