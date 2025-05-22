@@ -11,7 +11,7 @@ const S_RED_MIN = 0.5;
 const V_RED_MAX = 1.0;
 const V_RED_MIN = 0.25;     
 
-const H_GREEN_LOW = 85;      
+const H_GREEN_LOW = 80;      
 const H_GREEN_HIGH = 130;  
 const S_GREEN_MIN = 0.5;     
 const V_GREEN_MAX = 1.0;
@@ -36,15 +36,15 @@ const TOLERANCE = 0.5;
 let templates = [];
 let stateDurations = [];  // zbiera { state, duration }
 
+//zmiana wartosci badanego obszaru
 let sampleSizeRange = document.getElementById("sampleSizeRange");
 let sampleSizeText = document.getElementById("sampleSizeText");
 sampleSizeRange.addEventListener('input', (e) => {
-  const val =parseInt(e.target.value);
+  const val = parseInt(e.target.value);
   sampleSize = val
   sampleSizeText.innerHTML = "Obecna wartość to: "+ val;
 
 })
-
 
 // załaduj szablony
 fetch('templates.json')
