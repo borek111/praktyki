@@ -82,6 +82,8 @@ function StartCamera() {
         video = document.createElement('video');
         video.setAttribute('playsinline', '');
       }
+      let tmp = document.getElementById("tmp");
+      tmp.innerHTML = (stream.getVideoTracks()[0].getCapabilities().focusMode);
       video.srcObject = stream;
       video.play();
 
