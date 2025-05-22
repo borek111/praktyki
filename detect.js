@@ -39,6 +39,7 @@ let positions = [];
 let dragIndex = -1; // indeks przeciąganego pkt
 const HANDLE_SIZE = 10; // dodatkowy margines zlapania pkt
 
+
 //zmiana wartosci badanego obszaru
 let sampleSizeRange = document.getElementById("sampleSizeRange");
 let sampleSizeText = document.getElementById("sampleSizeText");
@@ -59,6 +60,9 @@ function changeCamera() {
   useFrontCamera = !useFrontCamera;
   StartCamera();
 }
+
+const changeCameraButton = document.getElementById("changeCameraButton");
+changeCameraButton.addEventListener('click',changeCamera);
 
 function StartCamera() {
   if (currentStream) {
