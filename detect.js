@@ -40,10 +40,7 @@ let dragIndex = -1; // indeks przeciąganego pkt
 const HANDLE_SIZE = 10; // dodatkowy margines zlapania pkt
 
 let pointTrackingState = [];
-let trackingStartTimes = []; // czas rozpoczęcia detekcji koloru dla każdego punktu
-
 const startTrackingDelay = 2000; // 2 sekundy
-const trackingStartTime = performance.now(); // zapisanie czasu startu
 
 
 
