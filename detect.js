@@ -39,6 +39,13 @@ let positions = [];
 let dragIndex = -1; // indeks przeciąganego pkt
 const HANDLE_SIZE = 10; // dodatkowy margines zlapania pkt
 
+let pointTrackingState = [];
+let trackingStartTimes = []; // czas rozpoczęcia detekcji koloru dla każdego punktu
+
+const startTrackingDelay = 2000; // 2 sekundy
+const trackingStartTime = performance.now(); // zapisanie czasu startu
+
+
 
 //zmiana wartosci badanego obszaru
 let sampleSizeRange = document.getElementById("sampleSizeRange");
@@ -98,6 +105,11 @@ function StartCamera() {
         { x: canvas.width * 0.875, y: canvas.height * 0.75  },
         { x: canvas.width * 0.875, y: canvas.height * (5/6)}
       ];
+      pointTrackingState = positions.map(_ => ({
+        tracking: false,
+        lastDetectedTime: 0,
+        lockedPos: null
+      }));
 
       // eventy do przeciągania punktów
       canvas.addEventListener('mousedown', startDrag);
@@ -223,80 +235,145 @@ function detectLed(video) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+  // Tablice do przechowywania wyników i wykryć kolorów dla każdego punktu
   const hsvResults = [];
   const redDetected = [];
   const greenDetected = [];
   const yellowDetected = [];
 
   positions.forEach((pos, i) => {
-    // odczyt pixeli centrowany wokół pos.x,pos.y
-    const data = ctx.getImageData(
-      pos.x - sampleSize/2,
-      pos.y - sampleSize/2,
-      sampleSize, sampleSize
-    ).data;
+    let x = pos.x, y = pos.y;
 
-    // obliczenia HSV
-    let sumH = 0, sumS = 0, sumV = 0;
-    const pxCount = sampleSize * sampleSize;
+    const imageData = ctx.getImageData(x - sampleSize / 2, y - sampleSize / 2, sampleSize, sampleSize);
+    const data = imageData.data;
+
+    let sumH = 0, sumS = 0, sumV = 0; 
+    const pxCount = sampleSize * sampleSize; 
+    const points = []; 
+
+    // Przetwarzaj każdy piksel w próbce
     for (let p = 0; p < data.length; p += 4) {
-      const [h, s, v] = rgbToHsv(data[p], data[p+1], data[p+2]);
-      sumH += h; sumS += s; sumV += v;
+      const px = p / 4;
+      const dx = px % sampleSize; // pozycja pikselu względem próbki
+      const dy = Math.floor(px / sampleSize);
+
+      const r = data[p], g = data[p + 1], b = data[p + 2]; 
+      const [h, s, v] = rgbToHsv(r, g, b); 
+      sumH += h;
+      sumS += s;
+      sumV += v;
+
+      points.push({ dx, dy, h, s, v });
     }
-    const avgH = sumH/pxCount, avgS = sumS/pxCount, avgV = sumV/pxCount;
+
+    const avgH = sumH / pxCount;
+    const avgS = sumS / pxCount;
+    const avgV = sumV / pxCount;
     hsvResults[i] = { avgH, avgS, avgV };
-    redDetected[i] = isRed(avgH, avgS, avgV);
-    greenDetected[i] = isGreen(avgH, avgS, avgV);
-    yellowDetected[i] = isYellow(avgH, avgS, avgV);
 
-    // rysowanie ramki (centrowanej) i numeru punktu
+    const isR = isRed(avgH, avgS, avgV);
+    const isG = isGreen(avgH, avgS, avgV);
+    const isY = isYellow(avgH, avgS, avgV);
+
+    redDetected[i] = isR;
+    greenDetected[i] = isG;
+    yellowDetected[i] = isY;
+
     let drawColor = 'blue';
-    if (redDetected[i])    drawColor = 'red';
-    else if (greenDetected[i])  drawColor = 'green';
-    else if (yellowDetected[i]) drawColor = 'yellow';
+    if (isR) drawColor = 'red';
+    else if (isG) drawColor = 'green';
+    else if (isY) drawColor = 'yellow';
 
-    highlightArea(ctx, pos.x, pos.y, sampleSize, drawColor);
-    // numer punktu na środku
+  
+    if (isR || isG || isY) {
+      const tracking = pointTrackingState[i];
+
+      // Sprawdź, czy już rozpoczęto śledzenie dla danego punktu
+      if (!tracking.tracking) {
+        tracking.tracking = true;
+        tracking.lastDetectedTime = now;
+      }
+      // Jeśli śledzenie już trwa i minął zadany czas opóźnienia
+      else if (now - tracking.lastDetectedTime >= startTrackingDelay) 
+      {
+        // Po 2 sekundach od pierwszego wykrycia: zablokuj pozycję początkową
+        if (!tracking.lockedPos) {
+          console.log(`Punkt ${i + 1} rozpoczął śledzenie po 2 sekundach.`);
+          tracking.lockedPos = true;
+        }
+
+        // Oblicz środek masy wykrytych pikseli w odpowiednim kolorze
+        let centerX = 0, centerY = 0, total = 0;
+        for (const pt of points) {
+          const { h, s, v } = pt;
+          // Sprawdź, czy punkt pasuje do wybranego koloru
+          const match = (isR && isRed(h, s, v)) ||
+                        (isG && isGreen(h, s, v)) ||
+                        (isY && isYellow(h, s, v));
+
+          if (match) {
+            centerX += pt.dx;
+            centerY += pt.dy;
+            total++;
+          }
+        }
+
+        if (total > 0) {
+          // Oblicz średnie przesunięcie względem środka próbki
+          const avgDX = centerX / total - sampleSize / 2;
+          const avgDY = centerY / total - sampleSize / 2;
+
+          // Przesuń pozycję punktu
+          positions[i].x += avgDX * 0.5;
+          positions[i].y += avgDY * 0.5;
+
+          positions[i].x = Math.max(0, Math.min(canvas.width, positions[i].x));
+          positions[i].y = Math.max(0, Math.min(canvas.height, positions[i].y));
+
+          console.log(`Punkt ${i + 1} przesunięty o x=${avgDX.toFixed(1)}, y=${avgDY.toFixed(1)}`);
+        }
+      }
+    }
+    // Jeśli kolor nie jest wykrywany — zatrzymaj śledzenie i odblokuj pozycję 
+    else
+    {
+      pointTrackingState[i].tracking = false;
+      pointTrackingState[i].lockedPos = null;
+    }
+
+    highlightArea(ctx, positions[i].x, positions[i].y, sampleSize, drawColor);
+
     ctx.fillStyle = 'white';
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(i+1, pos.x, pos.y);
+    ctx.fillText(i + 1, positions[i].x, positions[i].y);
   });
 
-  // log HSV
   log.innerHTML = hsvResults.map((r, i) =>
-    `Pole ${i+1}: H=${r.avgH.toFixed(1)}, ` +
-    `S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
+    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
   ).join('<br>');
 
-  // tabela co sekundę
   if (now - lastColorLogTime > 1000) {
     const symbols = hsvResults.map((_, i) => {
-      if (redDetected[i])    return 'R';
+      if (redDetected[i]) return 'R';
       if (yellowDetected[i]) return 'Y';
-      if (greenDetected[i])  return 'G';
-      return 'O';
+      if (greenDetected[i]) return 'G';
+      return 'O'; 
     });
 
     let html = `
     <table>
-      <tr>
-        <th>Punkt</th>
-        <th>Kolor</th>
-      </tr>`;
-    symbols.forEach((sym, i) => {
-      html += `<tr>
-        <td>${i+1}</td>
-        <td>${sym}</td>
-      </tr>`;
-    });
+      <tr><th>Punkt</th><th>Kolor</th></tr>`;
+        symbols.forEach((sym, i) => {
+          html += `<tr><td>${i + 1}</td><td>${sym}</td></tr>`;
+        });
     html += `</table>`;
+
     result.innerHTML = html;
     lastColorLogTime = now;
   }
 }
-
 
 function highlightArea(ctx, x, y, size, color = 'blue') {
   ctx.beginPath();
