@@ -41,8 +41,7 @@ const HANDLE_SIZE = 10; // dodatkowy margines zlapania pkt
 
 let pointTrackingState = [];
 const startTrackingDelay = 2000; // 2 sekundy
-
-
+let trackingLog = document.getElementById("trackingLog");
 
 //zmiana wartosci badanego obszaru
 let sampleSizeRange = document.getElementById("sampleSizeRange");
@@ -295,7 +294,8 @@ function detectLed(video) {
       {
         // Po 2 sekundach od pierwszego wykrycia: zablokuj pozycję początkową
         if (!tracking.lockedPos) {
-          console.log(`Punkt ${i + 1} rozpoczął śledzenie po 2 sekundach.`);
+          console.log(`Punkt ${i + 1} rozpoczął śledzenie po ${startTrackingDelay/1000} sekundach.`);
+          trackingLog.innerText = `Punkt ${i + 1} rozpoczął śledzenie po ${startTrackingDelay/1000} sekundach.`;
           tracking.lockedPos = true;
         }
 
@@ -303,22 +303,22 @@ function detectLed(video) {
         let centerX = 0, centerY = 0, total = 0;
         for (const pt of points) {
           const { h, s, v } = pt;
-          // Sprawdź, czy punkt pasuje do wybranego koloru
+          // Sprawdź, czy punkt pasuje do koloru
           const match = (isR && isRed(h, s, v)) ||
                         (isG && isGreen(h, s, v)) ||
                         (isY && isYellow(h, s, v));
 
           if (match) {
-            centerX += pt.dx;
-            centerY += pt.dy;
+            centerX += (pt.dx - sampleSize /2);
+            centerY += (pt.dy - sampleSize /2);
             total++;
           }
         }
 
         if (total > 0) {
           // Oblicz średnie przesunięcie względem środka próbki
-          const avgDX = centerX / total - sampleSize / 2;
-          const avgDY = centerY / total - sampleSize / 2;
+          const avgDX = centerX / total;
+          const avgDY = centerY / total;
 
           // Przesuń pozycję punktu
           positions[i].x += avgDX * 0.5;
@@ -381,7 +381,7 @@ function highlightArea(ctx, x, y, size, color = 'blue') {
 }
 
 function reset() {
-  result.textContent = 'Wynik: ';
+  result.innerHTML = '';
   stateDurations = [];
   lastState = 'off';
   lastSwitchTime = performance.now();
