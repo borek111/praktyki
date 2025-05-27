@@ -231,7 +231,9 @@ function detectLed(video) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  // Tablice do przechowywania wyników i wykryć kolorów dla każdego punktu
+  // Odległość minimalna między punktam
+  const MIN_SEPARATION = sampleSize; 
+
   const hsvResults = [];
   const redDetected = [];
   const greenDetected = [];
@@ -240,39 +242,40 @@ function detectLed(video) {
   positions.forEach((pos, i) => {
     let x = pos.x, y = pos.y;
 
-    const imageData = ctx.getImageData(x - sampleSize / 2, y - sampleSize / 2, sampleSize, sampleSize);
+    const imageData = ctx.getImageData(
+      x - sampleSize/2, 
+      y - sampleSize/2, 
+      sampleSize, 
+      sampleSize
+    );
     const data = imageData.data;
 
-    let sumH = 0, sumS = 0, sumV = 0; 
-    const pxCount = sampleSize * sampleSize; 
-    const points = []; 
+    let sumH = 0, sumS = 0, sumV = 0;
+    const pxCount = sampleSize * sampleSize;
+    const points = [];
 
-    // Przetwarzaj każdy piksel w próbce
     for (let p = 0; p < data.length; p += 4) {
-      const px = p / 4;
-      const dx = px % sampleSize; // pozycja pikselu względem próbki
+      const px = p/4;
+      const dx = px % sampleSize;
       const dy = Math.floor(px / sampleSize);
 
-      const r = data[p], g = data[p + 1], b = data[p + 2]; 
-      const [h, s, v] = rgbToHsv(r, g, b); 
-      sumH += h;
-      sumS += s;
-      sumV += v;
+      const r = data[p], g = data[p+1], b = data[p+2];
+      const [h, s, v] = rgbToHsv(r, g, b);
+      sumH += h; sumS += s; sumV += v;
 
       points.push({ dx, dy, h, s, v });
     }
 
-    const avgH = sumH / pxCount;
-    const avgS = sumS / pxCount;
-    const avgV = sumV / pxCount;
+    const avgH = sumH/pxCount;
+    const avgS = sumS/pxCount;
+    const avgV = sumV/pxCount;
     hsvResults[i] = { avgH, avgS, avgV };
 
     const isR = isRed(avgH, avgS, avgV);
     const isG = isGreen(avgH, avgS, avgV);
     const isY = isYellow(avgH, avgS, avgV);
-
-    redDetected[i] = isR;
-    greenDetected[i] = isG;
+    redDetected[i]    = isR;
+    greenDetected[i]  = isG;
     yellowDetected[i] = isY;
 
     let drawColor = 'blue';
@@ -280,93 +283,75 @@ function detectLed(video) {
     else if (isG) drawColor = 'green';
     else if (isY) drawColor = 'yellow';
 
-  
+    // Jeśli wykryto kolor, oblicz przesunięcie i zaproponuj nową pozycję
     if (isR || isG || isY) {
-      const tracking = pointTrackingState[i];
-
-      // Sprawdź, czy już rozpoczęto śledzenie dla danego punktu
-      if (!tracking.tracking) {
-        tracking.tracking = true;
-        tracking.lastDetectedTime = now;
-      }
-      // Jeśli śledzenie już trwa i minął zadany czas opóźnienia
-      else if (now - tracking.lastDetectedTime >= startTrackingDelay) 
-      {
-        // Po 2 sekundach od pierwszego wykrycia: zablokuj pozycję początkową
-        if (!tracking.lockedPos) {
-          console.log(`Punkt ${i + 1} rozpoczął śledzenie po ${startTrackingDelay/1000} sekundach.`);
-          trackingLog.innerText = `Punkt ${i + 1} rozpoczął śledzenie po ${startTrackingDelay/1000} sekundach.`;
-          tracking.lockedPos = true;
+      let centerX = 0, centerY = 0, total = 0;
+      for (const pt of points) {
+        const match = (isR && isRed(pt.h, pt.s, pt.v))
+                   || (isG && isGreen(pt.h, pt.s, pt.v))
+                   || (isY && isYellow(pt.h, pt.s, pt.v));
+        if (match) {
+          centerX += pt.dx - sampleSize/2;
+          centerY += pt.dy - sampleSize/2;
+          total++;
         }
+      }
 
-        // Oblicz środek masy wykrytych pikseli w odpowiednim kolorze
-        let centerX = 0, centerY = 0, total = 0;
-        for (const pt of points) {
-          const { h, s, v } = pt;
-          // Sprawdź, czy punkt pasuje do koloru
-          const match = (isR && isRed(h, s, v)) ||
-                        (isG && isGreen(h, s, v)) ||
-                        (isY && isYellow(h, s, v));
+      if (total > 0) {
+        const avgDX = centerX / total;
+        const avgDY = centerY / total;
+        // proponowana nowa pozycja
+        const newX = pos.x + avgDX * 0.5;
+        const newY = pos.y + avgDY * 0.5;
 
-          if (match) {
-            centerX += (pt.dx - sampleSize /2);
-            centerY += (pt.dy - sampleSize /2);
-            total++;
+        // Sprawdź, czy nie naruszy minimalnej odległości od pozostałych punktów
+        let canMove = true;
+        for (let j = 0; j < positions.length; j++) {
+          if (j === i) continue;
+          const dxi = newX - positions[j].x;
+          const dyi = newY - positions[j].y;
+          if (Math.hypot(dxi, dyi) < MIN_SEPARATION) {
+            console.log(` Punkt ${i+1} by zbliżył się do punktu ${j+1}  ruch anulowany`);
+            canMove = false;
+            break;
           }
         }
 
-        if (total > 0) {
-          // Oblicz średnie przesunięcie względem środka próbki
-          const avgDX = centerX / total;
-          const avgDY = centerY / total;
-
-          // Przesuń pozycję punktu
-          positions[i].x += avgDX * 0.5;
-          positions[i].y += avgDY * 0.5;
-
-          positions[i].x = Math.max(0, Math.min(canvas.width, positions[i].x));
-          positions[i].y = Math.max(0, Math.min(canvas.height, positions[i].y));
-
-          console.log(`Punkt ${i + 1} przesunięty o x=${avgDX.toFixed(1)}, y=${avgDY.toFixed(1)}`);
+        // Jeśli bezpieczne, zaktualizuj pozycję
+        if (canMove) {
+          positions[i].x = Math.max(0, Math.min(canvas.width,  newX));
+          positions[i].y = Math.max(0, Math.min(canvas.height, newY));
+          console.log(`Punkt ${i+1} przesunięty o x=${avgDX.toFixed(1)} y=${avgDY.toFixed(1)}`);
         }
       }
     }
-    // Jeśli kolor nie jest wykrywany — zatrzymaj śledzenie i odblokuj pozycję 
-    else
-    {
-      pointTrackingState[i].tracking = false;
-      pointTrackingState[i].lockedPos = null;
-    }
 
     highlightArea(ctx, positions[i].x, positions[i].y, sampleSize, drawColor);
-
     ctx.fillStyle = 'white';
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(i + 1, positions[i].x, positions[i].y);
+    ctx.fillText(i+1, positions[i].x, positions[i].y);
   });
 
+  // logi 
   log.innerHTML = hsvResults.map((r, i) =>
-    `Pole ${i + 1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
+    `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
   ).join('<br>');
 
-  if (now - lastColorLogTime > 1000) {
+  // Aktualizacja tabeli co sekundę
+  if (performance.now() - lastColorLogTime > 1000) {
     const symbols = hsvResults.map((_, i) => {
-      if (redDetected[i]) return 'R';
+      if (redDetected[i])   return 'R';
       if (yellowDetected[i]) return 'Y';
-      if (greenDetected[i]) return 'G';
-      return 'O'; 
+      if (greenDetected[i])  return 'G';
+      return 'O';
     });
-
-    let html = `
-    <table>
-      <tr><th>Punkt</th><th>Kolor</th></tr>`;
-        symbols.forEach((sym, i) => {
-          html += `<tr><td>${i + 1}</td><td>${sym}</td></tr>`;
-        });
+    let html = `<table><tr><th>Punkt</th><th>Kolor</th></tr>`;
+    symbols.forEach((sym, i) => {
+      html += `<tr><td>${i+1}</td><td>${sym}</td></tr>`;
+    });
     html += `</table>`;
-
     result.innerHTML = html;
     lastColorLogTime = now;
   }
