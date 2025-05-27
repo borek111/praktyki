@@ -226,10 +226,10 @@ function detectLed(video) {
 
   const MIN_SEPARATION = sampleSize;  // minimalna odległość między punktami
 
-  const hsvResults    = [];
-  const redDetected   = [];
+  const hsvResults = [];
+  const redDetected = [];
   const greenDetected = [];
-  const yellowDetected= [];
+  const yellowDetected = [];
 
   positions.forEach((pos, i) => {
     const imageData = ctx.getImageData(pos.x - sampleSize/2, pos.y - sampleSize/2, sampleSize, sampleSize);
@@ -239,7 +239,9 @@ function detectLed(video) {
     for (let p=0; p<data.length; p+=4) {
       const idx = p/4, dx = idx % sampleSize, dy = Math.floor(idx/sampleSize);
       const [h,s,v] = rgbToHsv(data[p], data[p+1], data[p+2]);
-      sumH+=h; sumS+=s; sumV+=v;
+      sumH+=h; 
+      sumS+=s;
+      sumV+=v;
       points.push({dx, dy, h, s, v});
     }
     const avgH = sumH/pxCount, avgS = sumS/pxCount, avgV = sumV/pxCount;
@@ -285,7 +287,7 @@ function detectLed(video) {
             positions[i].y = Math.max(0, Math.min(canvas.height, pos.y + (-ny)*(overlap/2)));
             positions[j].x = Math.max(0, Math.min(canvas.width, positions[j].x + nx*(overlap/2)));
             positions[j].y = Math.max(0, Math.min(canvas.height, positions[j].y + ny*(overlap/2)));
-            console.log(`Konflikt: punkty ${i+1} i ${j+1} zbyt blisko – wypchnięto o ${overlap.toFixed(1)}px`);
+            console.log(`Konflikt: punkty ${i+1} i ${j+1} zbyt blisko - wypchnięto o ${overlap.toFixed(1)}px`);
             break;
           }
         }
@@ -301,7 +303,9 @@ function detectLed(video) {
 
     //Rysowanie
     let color='blue';
-    if (isR) color='red'; else if (isG) color='green'; else if (isY) color='yellow';
+    if (isR) color='red'; 
+    else if (isG) color='green'; 
+    else if (isY) color='yellow';
     highlightArea(ctx, positions[i].x, positions[i].y, sampleSize, color);
     ctx.fillStyle='white';
     ctx.font='bold 14px sans-serif';
@@ -314,7 +318,7 @@ function detectLed(video) {
     `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
   ).join('<br>');
 
-  if (performance.now() - lastColorLogTime > 1000) {
+  if (now - lastColorLogTime > 1000) {
     const syms = hsvResults.map((_,i)=>
       redDetected[i]?'R': yellowDetected[i]?'Y': greenDetected[i]?'G':'O'
     );
