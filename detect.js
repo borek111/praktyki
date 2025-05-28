@@ -99,6 +99,11 @@ function StartCamera() {
         { x: canvas.width * 0.875, y: canvas.height * 0.75  },
         { x: canvas.width * 0.875, y: canvas.height * (5/6)}
       ];
+      pointTrackingState = positions.map(_ => ({
+        tracking: false,
+        lastDetectedTime: 0,
+        lockedPos: null
+      }));
 
       // eventy do przeciągania punktów
       canvas.addEventListener('mousedown', startDrag);
