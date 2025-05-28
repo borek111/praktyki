@@ -302,7 +302,9 @@ function detectLed(video) {
           if (!pointTrackingState[j].locked) continue;
           const dxj = newX - positions[j].x;
           const dyj = newY - positions[j].y;
-          if (Math.hypot(dxj, dyj) < MIN_SEPARATION) {
+          // uwzględnij promień okręgu (MIN_SEPARATION) jako sumę promieni obu punktów
+          const distance = Math.hypot(dxj, dyj);
+          if (distance < MIN_SEPARATION * 2) {
             console.log(`⚠️ Punkt ${i+1} nieporuszony - strefa punktu ${j+1}`);
             canMove = false;
             break;
