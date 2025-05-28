@@ -229,39 +229,34 @@ function detectLed(video) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const MIN_SEPARATION = sampleSize;  // minimalna odległość między śledzonymi punktami
+  const MIN_SEPARATION = sampleSize;  
 
   const hsvResults = [];
-  const redDetected = [];
+  const redDetected  = [];
   const greenDetected = [];
   const yellowDetected = [];
 
   positions.forEach((pos, i) => {
     const state = pointTrackingState[i];
-    let x = pos.x, y = pos.y;
+    const x0 = pos.x, y0 = pos.y;
 
     const img = ctx.getImageData(
-      x - sampleSize/2,
-      y - sampleSize/2,
-      sampleSize,
-      sampleSize
-    );
-    const data = img.data;
+      x0 - sampleSize/2, y0 - sampleSize/2,
+      sampleSize, sampleSize
+    ).data;
 
     let sumH = 0, sumS = 0, sumV = 0;
     const pxCount = sampleSize * sampleSize;
     const pixels = [];
-    for (let p = 0; p < data.length; p += 4) {
-      const idx = p / 4;
+    for (let p = 0; p < img.length; p += 4) {
+      const idx = p/4;
       const dx  = idx % sampleSize;
       const dy  = Math.floor(idx / sampleSize);
-      const [h, s, v] = rgbToHsv(data[p], data[p+1], data[p+2]);
+      const [h,s,v] = rgbToHsv(img[p], img[p+1], img[p+2]);
       sumH += h; sumS += s; sumV += v;
       pixels.push({ dx, dy, h, s, v });
     }
-    const avgH = sumH / pxCount;
-    const avgS = sumS / pxCount;
-    const avgV = sumV / pxCount;
+    const avgH = sumH/pxCount, avgS = sumS/pxCount, avgV = sumV/pxCount;
     hsvResults[i] = { avgH, avgS, avgV };
 
     const isR = isRed(avgH, avgS, avgV);
@@ -272,87 +267,94 @@ function detectLed(video) {
     yellowDetected[i] = isY;
 
     let drawColor = 'blue';
-    if (isR)      drawColor = 'red';
+    if (isR) drawColor = 'red';
     else if (isG) drawColor = 'green';
     else if (isY) drawColor = 'yellow';
 
+    // Jeśli kolor wykryty — natychmiast lock + tracking
     if (isR || isG || isY) {
       if (!state.locked) {
-        state.tracking = state.locked = true;
-        console.log(`➡️ Punkt ${i+1} rozpoczął śledzenie`);
+        state.locked = state.tracking = true;
+        console.log(`Punkt ${i+1} rozpoczął śledzenie`);
       }
 
-      //Oblicz centroid tylko w swoim obszarze
-      let cX = 0, cY = 0, tot = 0;
+      // centroida koloru
+      let cX=0, cY=0, tot=0;
       for (const pt of pixels) {
-        const match = (isR && isRed(pt.h, pt.s, pt.v))
-                   || (isG && isGreen(pt.h, pt.s, pt.v))
-                   || (isY && isYellow(pt.h, pt.s, pt.v));
+        const match = (isR && isRed(pt.h,pt.s,pt.v))
+                   || (isG && isGreen(pt.h,pt.s,pt.v))
+                   || (isY && isYellow(pt.h,pt.s,pt.v));
         if (match) {
           cX += pt.dx - sampleSize/2;
           cY += pt.dy - sampleSize/2;
           tot++;
         }
       }
-
       if (tot > 0) {
-        const avgDX = cX / tot;
-        const avgDY = cY / tot;
-        const newX = pos.x + avgDX * 0.5;
-        const newY = pos.y + avgDY * 0.5;
+        const avgDX = cX/tot;
+        const avgDY = cY/tot;
+        const newX = x0 + avgDX*0.5;
+        const newY = y0 + avgDY*0.5;
 
-        // jeśli j jest w trybie locked, to i nie może wejść w jego obszar MIN_SEPARATION
-        let canMove = true;
-        for (let j = 0; j < positions.length; j++) {
-          if (j === i) continue;
-          if (!pointTrackingState[j].locked) continue; // ignorujemy nie-śledzone
-          const dxj = newX - positions[j].x;
-          const dyj = newY - positions[j].y;
-          if (Math.hypot(dxj, dyj) < MIN_SEPARATION) {
-            console.log(`Punkt ${i+1} zablokowany przez śledzony punkt ${j+1}`);
-            canMove = false;
-            break;
+        //Kolizje z innymi pkt
+        let moved = false;
+        positions.forEach((p2, j) => {
+          if (j===i || !pointTrackingState[j].locked) return;
+          const dxj = newX - p2.x;
+          const dyj = newY - p2.y;
+          const dist = Math.hypot(dxj, dyj);
+          if (dist < MIN_SEPARATION) {
+            // odbicie
+            const overlap = MIN_SEPARATION - dist;
+            const nx = dxj/dist, ny = dyj/dist;
+            pos.x = x0 + nx*overlap;
+            pos.y = y0 + ny*overlap;
+            console.log(`Punkt ${i+1} odbity od ${j+1} o ${overlap.toFixed(1)}px`);
+            moved = true;
           }
-        }
-        // Jeśli wolne, aktualizujemy pozycję
-        if (canMove) {
-          positions[i].x = Math.max(0, Math.min(canvas.width,  newX));
-          positions[i].y = Math.max(0, Math.min(canvas.height, newY));
-          console.log(`Punkt ${i+1} przesunięty o Δx=${avgDX.toFixed(1)}, Δy=${avgDY.toFixed(1)}`);
+        });
+
+        if (!moved) {
+          pos.x = Math.max(0, Math.min(canvas.width,  newX));
+          pos.y = Math.max(0, Math.min(canvas.height, newY));
+          console.log(`Punkt ${i+1} przesunięty o x=${avgDX.toFixed(1)}, y=${avgDY.toFixed(1)}`);
         }
       }
     }
     else {
-      // Reset stanu, jeśli kolor zniknął
-      if (state.locked) {
-        console.log(`Punkt ${i+1} przestał być śledzony`);
-      }
+      if (state.locked) console.log(`Punkt ${i+1} zakończył śledzenie`);
       state.tracking = state.locked = false;
     }
 
-    highlightArea(ctx, positions[i].x, positions[i].y, sampleSize, drawColor);
+    //Rysowanie pola wykluczenia
+    if (state.locked) {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, MIN_SEPARATION, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fill();
+    }
+
+    highlightArea(ctx, pos.x, pos.y, sampleSize, drawColor);
     ctx.fillStyle = 'white';
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(i+1, positions[i].x, positions[i].y);
+    ctx.fillText(i+1, pos.x, pos.y);
   });
 
-  log.innerHTML = hsvResults.map((r, i) =>
+  log.innerHTML = hsvResults.map((r,i)=>
     `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
   ).join('<br>');
 
   if (performance.now() - lastColorLogTime > 1000) {
-    const symbols = hsvResults.map((_, i) => {
-      if      (redDetected[i])   return 'R';
-      else if (yellowDetected[i])return 'Y';
-      else if (greenDetected[i]) return 'G';
+    const symbols = hsvResults.map((_,i)=>{
+      if (redDetected[i])   return 'R';
+      if (yellowDetected[i])return 'Y';
+      if (greenDetected[i]) return 'G';
       return 'O';
     });
     let html = `<table><tr><th>Punkt</th><th>Kolor</th></tr>`;
-    symbols.forEach((sym, i) => {
-      html += `<tr><td>${i+1}</td><td>${sym}</td></tr>`;
-    });
+    symbols.forEach((s,i)=> html+=`<tr><td>${i+1}</td><td>${s}</td></tr>`);
     html += `</table>`;
     result.innerHTML = html;
     lastColorLogTime = now;
