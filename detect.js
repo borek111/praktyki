@@ -1,3 +1,4 @@
+
 const canvas = document.getElementById('canvas');
 const result = document.getElementById('result');
 const log = document.getElementById('log');
@@ -232,10 +233,10 @@ function detectLed(video) {
   // Minimalna odległość między śledzonymi punktami (w pikselach)
   const MIN_SEPARATION = sampleSize;
 
-  const hsvResults    = [];
-  const redDetected   = [];
+  const hsvResults = [];
+  const redDetected = [];
   const greenDetected = [];
-  const yellowDetected= [];
+  const yellowDetected = [];
 
   positions.forEach((pos, i) => {
     const state = pointTrackingState[i];
@@ -251,8 +252,8 @@ function detectLed(video) {
     const pixels = [];
     for (let p = 0; p < imgData.length; p += 4) {
       const idx = p / 4;
-      const dx  = idx % sampleSize;
-      const dy  = Math.floor(idx / sampleSize);
+      const dx = idx % sampleSize;
+      const dy = Math.floor(idx / sampleSize);
       const [h,s,v] = rgbToHsv(imgData[p], imgData[p+1], imgData[p+2]);
       sumH += h; sumS += s; sumV += v;
       pixels.push({ dx, dy, h, s, v });
@@ -305,12 +306,11 @@ function detectLed(video) {
           // uwzględnij promień okręgu (MIN_SEPARATION) jako sumę promieni obu punktów
           const distance = Math.hypot(dxj, dyj);
           if (distance < MIN_SEPARATION * 2) {
-            console.log(`⚠️ Punkt ${i+1} nieporuszony - strefa punktu ${j+1}`);
+            console.log(`Punkt ${i+1} nieporuszony - strefa punktu ${j+1}`);
             canMove = false;
             break;
           }
         }
-
         //aktualizacja tylko, gdy nie narusza strefy żadnego innego
         if (canMove) {
           pos.x = Math.max(0, Math.min(canvas.width,  newX));
@@ -332,12 +332,61 @@ function detectLed(video) {
     }
 
     highlightArea(ctx, pos.x, pos.y, sampleSize, drawColor);
-    ctx.fillStyle    = 'white';
-    ctx.font         = 'bold 14px sans-serif';
-    ctx.textAlign    = 'center';
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(i+1, pos.x, pos.y);
   });
+
+  // New function to repel overlapping points if at least one has detected color
+  function repelOverlappingPoints() {
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const posA = positions[i];
+        const posB = positions[j];
+        const stateA = pointTrackingState[i];
+        const stateB = pointTrackingState[j];
+
+        //weź pod uwagę tylko pary, w których przynajmniej jeden punkt wykrył kolor
+        if (!(stateA.locked || stateB.locked)) continue;
+
+        const dx = posB.x - posA.x;
+        const dy = posB.y - posA.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = MIN_SEPARATION * 2;
+
+        if (dist < minDist && dist > 0) {
+          const overlap = minDist - dist;
+          // policz wektor
+          const nx = dx / dist;
+          const ny = dy / dist;
+          // odepchnij punkty od siebie
+          // Jeśli oba są zablokowane, pchnij oba jednakowo, w przeciwnym wypadku pchnij tylko ten zablokowany
+          if (stateA.locked && stateB.locked) {
+            posA.x -= nx * overlap / 2;
+            posA.y -= ny * overlap / 2;
+            posB.x += nx * overlap / 2;
+            posB.y += ny * overlap / 2;
+          } else if (stateA.locked) {
+            posA.x -= nx * overlap;
+            posA.y -= ny * overlap;
+          } else if (stateB.locked) {
+            posB.x += nx * overlap;
+            posB.y += ny * overlap;
+          }
+
+          // ogranicz wszystko do granic kamery 
+          posA.x = Math.max(0, Math.min(canvas.width, posA.x));
+          posA.y = Math.max(0, Math.min(canvas.height, posA.y));
+          posB.x = Math.max(0, Math.min(canvas.width, posB.x));
+          posB.y = Math.max(0, Math.min(canvas.height, posB.y));
+        }
+      }
+    }
+  }
+
+  repelOverlappingPoints();
 
   log.innerHTML = hsvResults.map((r,i)=>
     `Pole ${i+1}: H=${r.avgH.toFixed(1)}, S=${r.avgS.toFixed(2)}, V=${r.avgV.toFixed(2)}`
