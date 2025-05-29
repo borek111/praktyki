@@ -231,7 +231,7 @@ function detectLed(video) {
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
   // Minimalna odległość między śledzonymi punktami (w pikselach)
-  const MIN_SEPARATION = sampleSize*3;
+  const MIN_SEPARATION = sampleSize;
 
   const hsvResults = [];
   const redDetected = [];
