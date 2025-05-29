@@ -231,7 +231,7 @@ function detectLed(video) {
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
   // Minimalna odległość między śledzonymi punktami (w pikselach)
-  const MIN_SEPARATION = sampleSize;
+  const MIN_SEPARATION = sampleSize*3;
 
   const hsvResults = [];
   const redDetected = [];
@@ -264,8 +264,8 @@ function detectLed(video) {
     const isR = isRed(avgH, avgS, avgV);
     const isG = isGreen(avgH, avgS, avgV);
     const isY = isYellow(avgH, avgS, avgV);
-    redDetected[i]    = isR;
-    greenDetected[i]  = isG;
+    redDetected[i] = isR;
+    greenDetected[i] = isG;
     yellowDetected[i] = isY;
 
     let drawColor = 'blue';
@@ -313,7 +313,7 @@ function detectLed(video) {
         }
         //aktualizacja tylko, gdy nie narusza strefy żadnego innego
         if (canMove) {
-          pos.x = Math.max(0, Math.min(canvas.width,  newX));
+          pos.x = Math.max(0, Math.min(canvas.width, newX));
           pos.y = Math.max(0, Math.min(canvas.height, newY));
           console.log(`Punkt ${i+1} przesunięty o x=${avgDX.toFixed(1)}, y=${avgDY.toFixed(1)}`);
         }
@@ -339,7 +339,7 @@ function detectLed(video) {
     ctx.fillText(i+1, pos.x, pos.y);
   });
 
-  // New function to repel overlapping points if at least one has detected color
+  // funkcja do auto odbijania
   function repelOverlappingPoints() {
     for (let i = 0; i < positions.length; i++) {
       for (let j = i + 1; j < positions.length; j++) {
@@ -348,7 +348,7 @@ function detectLed(video) {
         const stateA = pointTrackingState[i];
         const stateB = pointTrackingState[j];
 
-        //weź pod uwagę tylko pary, w których przynajmniej jeden punkt wykrył kolor
+        // weź pod uwagę tylko pary, w których przynajmniej jeden punkt wykrył kolor
         if (!(stateA.locked || stateB.locked)) continue;
 
         const dx = posB.x - posA.x;
@@ -362,18 +362,18 @@ function detectLed(video) {
           const nx = dx / dist;
           const ny = dy / dist;
           // odepchnij punkty od siebie
-          // Jeśli oba są zablokowane, pchnij oba jednakowo, w przeciwnym wypadku pchnij tylko ten zablokowany
+          // Jeśli oba są zablokowane, pchnij oba jednakowo, w przeciwnym wypadku pchnij tylko ten ktory nie sledzi
           if (stateA.locked && stateB.locked) {
             posA.x -= nx * overlap / 2;
             posA.y -= ny * overlap / 2;
             posB.x += nx * overlap / 2;
             posB.y += ny * overlap / 2;
-          } else if (stateA.locked) {
+          } else if (stateA.locked && !stateB.locked) {
+            posB.x += nx * overlap;
+            posB.y += ny * overlap;         
+          } else if (stateB.locked && !stateA.locked) {
             posA.x -= nx * overlap;
             posA.y -= ny * overlap;
-          } else if (stateB.locked) {
-            posB.x += nx * overlap;
-            posB.y += ny * overlap;
           }
 
           // ogranicz wszystko do granic kamery 
@@ -394,8 +394,8 @@ function detectLed(video) {
 
   if (performance.now() - lastColorLogTime > 1000) {
     const symbols = hsvResults.map((_,i)=>{
-      if (redDetected[i])   return 'R';
-      if (yellowDetected[i])return 'Y';
+      if (redDetected[i]) return 'R';
+      if (yellowDetected[i]) return 'Y';
       if (greenDetected[i]) return 'G';
       return 'O';
     });
